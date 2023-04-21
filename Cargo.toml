@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "sm83",
+    "sm83_decoder_macros",
+]

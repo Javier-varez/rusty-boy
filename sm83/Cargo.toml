@@ -1,0 +1,8 @@
+[package]
+name = "sm83"
+version = "0.1.0"
+edition = "2021"
+description = "An sm83 core emulator for GameBoy"
+
+[dependencies]
+sm83_decoder_macros = { path = "../sm83_decoder_macros" }
