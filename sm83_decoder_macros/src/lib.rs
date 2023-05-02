@@ -1,20 +1,17 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, TokenTree};
+use quote::ToTokens;
 use std::collections::hash_map::HashMap;
-use syn::{
-    braced, bracketed, parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned,
-    Token,
-};
+use syn::{braced, bracketed, parse::Parse, parse_macro_input, punctuated::Punctuated, Token};
 
 struct VarDecl {
     var_ident: syn::Ident,
-    colon: Token![:],
     ty: syn::Ident,
 }
 
 impl Parse for VarDecl {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let var_ident: syn::Ident = input.parse()?;
-        let colon = input.parse()?;
+        let _colon: Token![:] = input.parse()?;
         let ty = input.parse()?;
 
         let var_ident_str = var_ident.to_string();
@@ -25,11 +22,7 @@ impl Parse for VarDecl {
             ));
         }
 
-        Ok(Self {
-            var_ident,
-            colon,
-            ty,
-        })
+        Ok(Self { var_ident, ty })
     }
 }
 
@@ -74,24 +67,25 @@ impl Parse for DecodingStatement {
     }
 }
 
-struct Field {
+struct Field<'a> {
     msb: usize,
     lsb: usize,
-    ty: syn::Ident,
+    ty: &'a Declaration,
+    var_name: char,
 }
 
-impl Field {
+impl<'a> Field<'a> {
     fn value_mask(&self) -> usize {
         return 1 << (self.msb - self.lsb + 1);
     }
 }
 
 impl DecodingStatement {
-    fn generate_fields_from_pattern(
+    fn generate_field_from_pattern<'a>(
         bit_pattern: &syn::LitStr,
         var_decl: &VarDecl,
-        type_decls: &Declarations,
-    ) -> syn::Result<Field> {
+        type_decls: &'a Declarations,
+    ) -> syn::Result<Field<'a>> {
         let bit_pattern_str = bit_pattern.value();
         let expected_char = var_decl.var_ident.to_string().chars().next().unwrap();
 
@@ -115,17 +109,36 @@ impl DecodingStatement {
             .find(|(_, c)| *c == expected_char)
             .map(|(idx, _)| idx);
 
+        // At this point we know that both are valid (if msb is found, lsb must also be found),
+        // so unwrapping is fine
+        let lsb = lsb.unwrap();
+        let msb = msb.unwrap();
+
+        let is_range_contiguous = bit_pattern_str
+            .chars()
+            .rev()
+            .into_iter()
+            .skip(lsb)
+            .take(msb - lsb + 1)
+            .fold(true, |valid, current| valid && (current == expected_char));
+
+        if !is_range_contiguous {
+            let message = format!("Bit pattern is not contiguous! `{}`", expected_char);
+            return Err(syn::Error::new(bit_pattern.span(), message));
+        }
+
         let ty = type_decls.find_type(&var_decl.ty);
         if ty.is_none() {
-            let message = format!("Unknown type {:?}", var_decl.ty);
+            let message = format!("Unknown type `{}`", var_decl.ty);
             return Err(syn::Error::new(var_decl.ty.span(), message));
         }
         let ty = ty.unwrap();
 
         let field = Field {
-            msb: msb.unwrap(),
-            lsb: lsb.unwrap(),
-            ty: var_decl.ty.clone(),
+            msb,
+            lsb,
+            ty,
+            var_name: expected_char,
         };
 
         for decl_val in &ty.values {
@@ -142,13 +155,167 @@ impl DecodingStatement {
         Ok(field)
     }
 
-    fn generate_map_entries(&self, types: &Declarations) -> HashMap<usize, DecoderRow> {
-        let mut map = HashMap::new();
+    fn map_tokens(
+        &self,
+        stream: TokenStream,
+        replacements: &HashMap<char, TokenStream>,
+    ) -> syn::Result<TokenStream> {
+        let mut result = TokenStream::new();
+        let mut iter = stream.into_iter();
+        while let Some(token) = iter.next() {
+            match token {
+                TokenTree::Punct(punct) if punct.as_char() == '#' => {
+                    let replacement_name = iter
+                        .next()
+                        .and_then(|v| match v {
+                            TokenTree::Ident(id) if id.to_string().len() == 1 => {
+                                Some(id.to_string())
+                            }
+                            _ => None,
+                        })
+                        .ok_or_else(|| {
+                            syn::Error::new(
+                                punct.span(),
+                                "# is not followed by a valid variable identifier",
+                            )
+                        })?;
+
+                    let Some(replacement) =
+                        replacements.get(&replacement_name.chars().next().unwrap())
+                    else {
+                        return Err(syn::Error::new(punct.span(), "No replacement for variable"));
+                    };
+                    result.extend((*replacement).clone());
+                }
+                TokenTree::Group(group) => {
+                    let inner = self.map_tokens(group.stream(), replacements)?;
+                    let delimiter = group.delimiter();
+                    let stream = match delimiter {
+                        proc_macro2::Delimiter::Brace => quote::quote! {
+                            { #inner }
+                        },
+                        proc_macro2::Delimiter::Parenthesis => quote::quote! {
+                            ( #inner )
+                        },
+                        proc_macro2::Delimiter::Bracket => quote::quote! {
+                            [ #inner ]
+                        },
+                        proc_macro2::Delimiter::None => quote::quote! {
+                             #inner
+                        },
+                    };
+                    result.extend(stream);
+                }
+                _ => result.extend(token.into_token_stream()),
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn replace_vars_in_body(
+        &self,
+        var_indexes: &[usize],
+        fields: &[Field],
+    ) -> syn::Result<TokenStream> {
+        let mut replacements = HashMap::new();
+        for (idx, field) in var_indexes.iter().zip(fields.iter()) {
+            let type_ident = &field.ty.ident;
+            let member_ident = &field.ty.values[*idx].label;
+            let var_name = &field.var_name;
+
+            let stream = quote::quote! {
+                #type_ident::#member_ident
+            };
+
+            replacements.insert(*var_name, stream);
+        }
+
+        self.map_tokens(self.body.clone(), &replacements)
+    }
+
+    fn generate_map_entries(
+        &self,
+        types: &Declarations,
+    ) -> syn::Result<HashMap<usize, DecoderRow>> {
+        let mut fields = vec![];
+        let mut var_indexes = vec![];
+
+        // Reverses the pattern to start on lsb
+        let mut zeroed_pattern: String = self.bit_pattern.value().chars().rev().collect();
 
         // We need to take the variables and create all combinatorics for each variable.
-        for var_decl in &self.var_decls {}
+        for var_decl in &self.var_decls {
+            let field = Self::generate_field_from_pattern(&self.bit_pattern, var_decl, types)?;
 
-        return map;
+            zeroed_pattern = zeroed_pattern
+                .chars()
+                .into_iter()
+                .enumerate()
+                .map(|(idx, c)| {
+                    if idx >= field.lsb && idx <= field.msb {
+                        '0'
+                    } else {
+                        c
+                    }
+                })
+                .collect();
+
+            fields.push(field);
+            var_indexes.push(0_usize);
+        }
+
+        // Reverses the pattern to start on msb and parses it.
+        let zeroed_pattern: String = zeroed_pattern.chars().rev().collect();
+        let zeroed_pattern = usize::from_str_radix(&zeroed_pattern, 2).map_err(|_| {
+            syn::Error::new(self.bit_pattern.span(), "Pattern contains unexpanded data")
+        })?;
+
+        let dims = fields.len();
+
+        let mut map = HashMap::new();
+        'outer: loop {
+            let mut opcode = zeroed_pattern;
+            for (field, index) in fields.iter().zip(var_indexes.iter()) {
+                let field_val: usize = field
+                    .ty
+                    .values
+                    .iter()
+                    .skip(*index)
+                    .next()
+                    .expect("Invalid field index! This is a bug in the macro!")
+                    .value
+                    .base10_parse()?;
+
+                opcode |= field_val << field.lsb;
+            }
+
+            map.insert(
+                opcode,
+                DecoderRow {
+                    token_stream: self.replace_vars_in_body(&var_indexes, &fields)?,
+                },
+            );
+
+            // Trigger next permutation or exit
+            let mut current_var = 0;
+            'inner: loop {
+                if current_var >= dims {
+                    break 'outer;
+                }
+
+                let next_idx = var_indexes[current_var] + 1;
+                let field = &fields[current_var];
+                if next_idx == field.ty.values.len() {
+                    var_indexes[current_var] = 0;
+                    current_var += 1;
+                } else {
+                    var_indexes[current_var] = next_idx;
+                    break 'inner;
+                }
+            }
+        }
+        Ok(map)
     }
 }
 
@@ -303,29 +470,29 @@ impl DecoderTable {
         let element_type = &self.element_type;
         let table_size = &self.table_size;
 
-        // TODO: remove this for loop (test code to trigger an error...)
+        let mut hash_table = HashMap::new();
         for statement in &self.statements {
-            for var_decl in &statement.var_decls {
-                if let Err(err) = DecodingStatement::generate_fields_from_pattern(
-                    &statement.bit_pattern,
-                    var_decl,
-                    &self.decls,
-                ) {
-                    return err.to_compile_error();
+            match statement.generate_map_entries(&self.decls) {
+                Err(err) => return err.to_compile_error(),
+                Ok(map_entries) => {
+                    hash_table.extend(map_entries.into_iter());
                 }
             }
         }
 
-        // TODO: populate with actual data
-        let thingy = quote::quote! {
-            OpCode::Ld8RegReg(Register::A, Register::A)
-        };
-
-        let thingy = std::iter::repeat(thingy).take(self.table_size);
+        let mut entries = vec![];
+        for i in 0..self.table_size {
+            if let Some(entry) = hash_table.get(&i) {
+                let stream = &entry.token_stream;
+                entries.push(quote::quote! { Some(#stream) });
+            } else {
+                entries.push(quote::quote! {None});
+            }
+        }
 
         quote::quote! {
-            pub const #table_name : [#element_type; #table_size] = [
-                #(#thingy),*
+            pub const #table_name : [Option<#element_type>; #table_size] = [
+                #(#entries),*
             ];
         }
     }
