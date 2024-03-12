@@ -1,20 +1,12 @@
 use sm83_decoder_macros::generate_decoder_table;
 
-pub enum Argument {
-    ImmediateU8(u8),
-    ImmediateU16(u16),
-    Register(Register),
-    RegisterPair(RegisterPair),
-    IndirectU8(u16),
-    IndirectU16(u16),
-}
-
 pub enum OpCode {
-    Ld8RegReg(Register, Register),
-    Ld8RegImm(Register),
-    Ld8RegRegInd(Register, RegisterPair),
-    Ld8RegIndReg(RegisterPair, Register),
-    Ld8RegIndImm(RegisterPair),
+    Ld8RegReg(Register, Register),     // ld Register, Register
+    Ld8RegImm(Register),               // ld Register, n8
+    Ld8RegInd(Register, RegisterPair), // ld Register, [RegisterPair]
+    Ld8IndReg(RegisterPair, Register), // ld [RegisterPair], Register
+    Ld8IndImm(RegisterPair),           // ld [RegisterPair], n8
+    Halt,                              // halt
 }
 
 // r => destination reg
@@ -42,9 +34,10 @@ generate_decoder_table! {
     }
     DECODER_TABLE: [OpCode; 256] {
         [r: Register, R: Register] "01rrrRRR" => { OpCode::Ld8RegReg(#r, #R) },
+        [r: Register] "01rrr110" => { OpCode::Ld8RegInd(#r, RegisterPair::HL) },
+        [R: Register] "01110RRR" => { OpCode::Ld8IndReg(RegisterPair::HL, #R) },
+        [] "01110110" => { OpCode::Halt },
         [r: Register] "00rrr110" => { OpCode::Ld8RegImm(#r) },
-        [r: Register] "01rrr110" => { OpCode::Ld8RegRegInd(#r, RegisterPair::HL) },
-        [R: Register] "01110RRR" => { OpCode::Ld8RegIndReg(RegisterPair::HL, #R) },
-        [] "01110110" => { OpCode::Ld8RegIndImm(RegisterPair::HL) },
+        [] "00110110" => { OpCode::Ld8IndImm(RegisterPair::HL) },
     }
 }
