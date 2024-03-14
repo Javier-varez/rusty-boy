@@ -484,14 +484,16 @@ impl DecoderTable {
         for i in 0..self.table_size {
             if let Some(entry) = hash_table.get(&i) {
                 let stream = &entry.token_stream;
-                entries.push(quote::quote! { Some(#stream) });
+                entries.push(quote::quote! { #stream });
             } else {
-                entries.push(quote::quote! {None});
+                let err = syn::Error::new(table_name.span(), format!("No match for opcode {i:#x}"))
+                    .to_compile_error();
+                entries.push(err);
             }
         }
 
         quote::quote! {
-            pub const #table_name : [Option<#element_type>; #table_size] = [
+            pub const #table_name : [#element_type; #table_size] = [
                 #(#entries),*
             ];
         }
