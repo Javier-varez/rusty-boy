@@ -418,7 +418,6 @@ struct DecoderRow {
 }
 
 struct DecoderTable {
-    decls: Declarations,
     table_ident: syn::Ident,
     element_type: syn::Type,
     table_size: usize,
@@ -428,8 +427,6 @@ struct DecoderTable {
 impl Parse for DecoderTable {
     /// Parses a SeqItem from a ParseStream
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let decls: Declarations = input.parse()?;
-
         let table_ident: syn::Ident = input.parse()?;
         let _: Token![:] = input.parse()?;
 
@@ -444,7 +441,6 @@ impl Parse for DecoderTable {
 
         let statements = table_statements.parse_terminated(DecodingStatement::parse, Token![,])?;
         Ok(Self {
-            decls,
             table_ident,
             element_type,
             table_size,
@@ -454,25 +450,14 @@ impl Parse for DecoderTable {
 }
 
 impl DecoderTable {
-    fn generate(&self) -> TokenStream {
-        let enum_decls = self.generate_enum_decls();
-        let table_decl = self.generate_table();
-
-        quote::quote! {
-            #enum_decls
-            #table_decl
-        }
-        .into()
-    }
-
-    fn generate_table(&self) -> TokenStream {
+    fn generate(&self, declarations: &Declarations) -> TokenStream {
         let table_name = &self.table_ident;
         let element_type = &self.element_type;
         let table_size = &self.table_size;
 
         let mut hash_table = HashMap::new();
         for statement in &self.statements {
-            match statement.generate_map_entries(&self.decls) {
+            match statement.generate_map_entries(declarations) {
                 Err(err) => return err.to_compile_error(),
                 Ok(map_entries) => {
                     hash_table.extend(map_entries.into_iter());
@@ -497,6 +482,34 @@ impl DecoderTable {
                 #(#entries),*
             ];
         }
+    }
+}
+
+struct DecoderTables {
+    decls: Declarations,
+    tables: Punctuated<DecoderTable, Token![,]>,
+}
+
+impl Parse for DecoderTables {
+    /// Parses a SeqItem from a ParseStream
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let decls: Declarations = input.parse()?;
+
+        let tables: Punctuated<DecoderTable, Token![,]> =
+            input.parse_terminated(DecoderTable::parse, Token![,])?;
+        Ok(Self { decls, tables })
+    }
+}
+
+impl DecoderTables {
+    fn generate(&self) -> TokenStream {
+        let enum_decls = self.generate_enum_decls();
+        let table_decls = self.tables.iter().map(|t| t.generate(&self.decls));
+        quote::quote! {
+            #enum_decls
+            #(#table_decls)*
+        }
+        .into()
     }
 
     fn generate_enum_decls(&self) -> TokenStream {
@@ -523,7 +536,7 @@ impl DecoderTable {
 }
 
 #[proc_macro]
-pub fn generate_decoder_table(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let table = parse_macro_input!(input as DecoderTable);
+pub fn generate_decoder_tables(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let table = parse_macro_input!(input as DecoderTables);
     table.generate().into()
 }

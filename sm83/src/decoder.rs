@@ -1,4 +1,4 @@
-use sm83_decoder_macros::generate_decoder_table;
+use sm83_decoder_macros::generate_decoder_tables;
 
 pub enum OpCode {
     Ld8RegReg(Register, Register),                 // ld Register, Register
@@ -83,7 +83,7 @@ pub enum OpCode {
 // r => destination reg
 // R => source reg
 
-generate_decoder_table! {
+generate_decoder_tables! {
     Declarations {
         Register {
             A = 7,
