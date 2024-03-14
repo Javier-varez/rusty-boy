@@ -78,6 +78,28 @@ pub enum OpCode {
     Di,                                            // di
     Ei,                                            // ei
     Illegal,                                       // Illegal
+    RlcReg(Register),                              // rlc Register
+    RrcReg(Register),                              // rrc Register
+    RlReg(Register),                               // rl Register
+    RrReg(Register),                               // rr Register
+    SlaReg(Register),                              // sla Register
+    SraReg(Register),                              // sra Register
+    SwapReg(Register),                             // swap Register
+    SrlReg(Register),                              // srl Register
+    Bit(Bit, Register),                            // bit #bit, Register
+    Res(Bit, Register),                            // srl #bit, Register
+    Set(Bit, Register),                            // srl #bit, Register
+    RlcHlInd,                                      // rlc [HL]
+    RrcHlInd,                                      // rrc [HL]
+    RlHlInd,                                       // rl [HL]
+    RrHlInd,                                       // rr [HL]
+    SlaHlInd,                                      // sla [HL]
+    SraHlInd,                                      // sra [HL]
+    SwapHlInd,                                     // swap [HL]
+    SrlHlInd,                                      // srl [HL]
+    BitHlInd(Bit),                                 // bit #bit, [HL]
+    ResHlInd(Bit),                                 // srl #bit, [HL]
+    SetHlInd(Bit),                                 // srl #bit, [HL]
 }
 
 // r => destination reg
@@ -127,6 +149,16 @@ generate_decoder_tables! {
             Addr0x28 = 5,
             Addr0x30 = 6,
             Addr0x38 = 7,
+        },
+        Bit {
+            Bit0 = 0,
+            Bit1 = 1,
+            Bit2 = 2,
+            Bit3 = 3,
+            Bit4 = 4,
+            Bit5 = 5,
+            Bit6 = 6,
+            Bit7 = 7,
         }
     }
     DECODER_TABLE: [OpCode; 256] {
@@ -219,5 +251,29 @@ generate_decoder_tables! {
         [] "11011101" => { OpCode::Illegal },
         [] "11101101" => { OpCode::Illegal },
         [] "11111101" => { OpCode::Illegal },
-    }
+    },
+    PREFIXED_TABLE: [OpCode; 256] {
+        [r: Register] "00000rrr" => { OpCode::RlcReg(#r) },
+        [r: Register] "00001rrr" => { OpCode::RrcReg(#r) },
+        [r: Register] "00010rrr" => { OpCode::RlReg(#r) },
+        [r: Register] "00011rrr" => { OpCode::RrReg(#r) },
+        [r: Register] "00100rrr" => { OpCode::SlaReg(#r) },
+        [r: Register] "00101rrr" => { OpCode::SraReg(#r) },
+        [r: Register] "00110rrr" => { OpCode::SwapReg(#r) },
+        [r: Register] "00111rrr" => { OpCode::SrlReg(#r) },
+        [] "00000110" => { OpCode::RlcHlInd },
+        [] "00001110" => { OpCode::RrcHlInd },
+        [] "00010110" => { OpCode::RlHlInd },
+        [] "00011110" => { OpCode::RrHlInd },
+        [] "00100110" => { OpCode::SlaHlInd },
+        [] "00101110" => { OpCode::SraHlInd },
+        [] "00110110" => { OpCode::SwapHlInd },
+        [] "00111110" => { OpCode::SrlHlInd },
+        [r: Register, b: Bit] "01bbbrrr" => { OpCode::Bit(#b, #r) },
+        [r: Register, b: Bit] "10bbbrrr" => { OpCode::Res(#b, #r) },
+        [r: Register, b: Bit] "11bbbrrr" => { OpCode::Set(#b, #r) },
+        [b: Bit] "01bbb110" => { OpCode::BitHlInd(#b) },
+        [b: Bit] "10bbb110" => { OpCode::ResHlInd(#b) },
+        [b: Bit] "11bbb110" => { OpCode::SetHlInd(#b) },
+    },
 }
