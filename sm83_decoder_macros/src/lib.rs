@@ -525,6 +525,7 @@ impl DecoderTables {
             });
 
             let enum_tokens = quote::quote! {
+                #[derive(Debug, Clone, Copy, Eq, PartialEq)]
                 pub enum #name {
                     #(#val_decls),*
                 }

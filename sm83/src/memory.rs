@@ -1,6 +1,6 @@
 pub type Address = u16;
 
 pub trait Memory {
-    fn read(&self, address: Address) -> u8;
-    fn write(&self, address: Address, value: u8);
+    fn read(&mut self, address: Address) -> u8;
+    fn write(&mut self, address: Address, value: u8);
 }

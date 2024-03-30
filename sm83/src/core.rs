@@ -1,19 +1,83 @@
-pub enum Register {
-    AF = 0,
-    BC = 1,
-    DE = 2,
-    HL = 3,
-    SP = 4,
-    PC = 5,
-}
+use crate::{
+    decoder::{
+        self, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairMem, RegisterPairStack,
+        ResetTarget,
+    },
+    memory::{Address, Memory},
+};
 
 struct InterruptRegisters {
     iff1: bool,
     iff2: bool,
 }
 
+impl Default for InterruptRegisters {
+    fn default() -> Self {
+        Self {
+            iff1: false,
+            iff2: false,
+        }
+    }
+}
+
+impl InterruptRegisters {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Copy, Clone)]
+pub enum Flag {
+    Z = 1 << 7,
+    N = 1 << 6,
+    H = 1 << 5,
+    C = 1 << 4,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Flags(u8);
+
+impl Default for Flags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<u8> for Flags {
+    fn from(value: u8) -> Self {
+        Self(value)
+    }
+}
+
+impl Into<u8> for Flags {
+    fn into(self) -> u8 {
+        self.0
+    }
+}
+
+impl Flags {
+    pub const fn new() -> Self {
+        Self(0)
+    }
+
+    pub const fn with(mut self, flag: Flag, value: bool) -> Self {
+        if value {
+            self.0 |= flag as u8;
+        } else {
+            self.0 &= !(flag as u8);
+        }
+        self
+    }
+
+    pub const fn is_flag_set(&self, flag: Flag) -> bool {
+        (self.0 & flag as u8) != 0
+    }
+}
+
+#[derive(Debug, Clone)]
 struct Registers {
-    flags: u8,
+    flags: Flags,
     a_reg: u8,
     b_reg: u8,
     c_reg: u8,
@@ -25,8 +89,1022 @@ struct Registers {
     pc_reg: u16,
 }
 
-struct CoreState {
+impl Default for Registers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Registers {
+    const fn new() -> Self {
+        Self {
+            flags: Flags::new(),
+            a_reg: 0,
+            b_reg: 0,
+            c_reg: 0,
+            d_reg: 0,
+            e_reg: 0,
+            h_reg: 0,
+            l_reg: 0,
+            // TODO: check what this should be initialized to
+            sp_reg: 0,
+            // TODO: check what the reset vector should be
+            pc_reg: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Cycles(usize);
+
+const fn carry_bit8(a: u8, b: u8, c: u8, bit: usize) -> bool {
+    assert!(bit < 8);
+    let xor = a ^ b ^ c;
+    (xor & (1 << bit)) != 0
+}
+
+const fn carry_bit16(a: u16, b: u16, c: u16, bit: usize) -> bool {
+    assert!(bit < 16);
+    let xor = a ^ b ^ c;
+    (xor & (1 << bit)) != 0
+}
+
+const fn carry_bit32(a: u32, b: u32, c: u32, bit: usize) -> bool {
+    assert!(bit < 32);
+    let xor = a ^ b ^ c;
+    (xor & (1 << bit)) != 0
+}
+
+const fn add(a: u8, b: u8, carry: bool) -> (u8, Flags) {
+    let a = a as u16;
+    let b = b as u16;
+    let result = a + b + if carry { 1 } else { 0 };
+
+    let flags = Flags::new()
+        .with(Flag::Z, result == 0)
+        .with(Flag::N, false)
+        .with(Flag::H, carry_bit16(a, b, result, 4))
+        .with(Flag::C, carry_bit16(a, b, result, 8));
+
+    (result as u8, flags)
+}
+
+const fn add16(a: u16, b: u16) -> (u16, Flags) {
+    let a = a as u32;
+    let b = b as u32;
+    let result = a + b;
+
+    let flags = Flags::new()
+        .with(Flag::Z, result == 0) // TODO: should it set the zero flag?
+        .with(Flag::N, false)
+        .with(Flag::H, carry_bit32(a, b, result, 12))
+        .with(Flag::C, carry_bit32(a, b, result, 16));
+
+    (result as u16, flags)
+}
+
+const fn sub(a: u8, b: u8, carry: bool) -> (u8, Flags) {
+    let carry = if carry { 1 } else { 0 };
+    let result = a.wrapping_sub(b).wrapping_sub(carry);
+
+    let flags = Flags::new()
+        .with(Flag::Z, result == 0)
+        .with(Flag::N, true)
+        .with(Flag::H, (0xf & b.wrapping_add(carry)) > (0xf & a))
+        .with(Flag::C, b > a);
+
+    (result, flags)
+}
+
+const fn and(a: u8, b: u8) -> (u8, Flags) {
+    let result = a & b;
+
+    let flags = Flags::new().with(Flag::Z, result == 0).with(Flag::H, true);
+
+    (result, flags)
+}
+
+const fn or(a: u8, b: u8) -> (u8, Flags) {
+    let result = a | b;
+    let flags = Flags::new().with(Flag::Z, result == 0);
+    (result, flags)
+}
+
+const fn xor(a: u8, b: u8) -> (u8, Flags) {
+    let result = a ^ b;
+    let flags = Flags::new().with(Flag::Z, result == 0);
+    (result, flags)
+}
+
+const fn rlc(value: u8) -> (u8, Flags) {
+    let carry = (value & 0x80) != 0;
+    let mut shifted = value << 1;
+    if carry {
+        shifted |= 1;
+    }
+    let flags = Flags::new().with(Flag::C, carry);
+    (shifted, flags)
+}
+
+const fn rrc(value: u8) -> (u8, Flags) {
+    let carry = (value & 0x01) != 0;
+    let mut shifted = value >> 1;
+    if carry {
+        shifted |= 0x80;
+    }
+    let flags = Flags::new().with(Flag::C, carry);
+    (shifted, flags)
+}
+
+const fn rl(value: u8, old_carry: bool) -> (u8, Flags) {
+    let mut shifted = value << 1;
+    if old_carry {
+        shifted |= 0x01;
+    }
+    let new_carry = (value & 0x80) != 0;
+    let flags = Flags::new().with(Flag::C, new_carry);
+    (shifted, flags)
+}
+
+const fn rr(value: u8, old_carry: bool) -> (u8, Flags) {
+    let mut shifted = value >> 1;
+    if old_carry {
+        shifted |= 0x80;
+    }
+    let new_carry = (value & 0x01) != 0;
+    let flags = Flags::new().with(Flag::C, new_carry);
+    (shifted, flags)
+}
+
+const fn sla(value: u8) -> (u8, Flags) {
+    let shifted = value << 1;
+    let new_carry = (value & 0x80) != 0;
+    let flags = Flags::new()
+        .with(Flag::C, new_carry)
+        .with(Flag::Z, shifted == 0);
+    (shifted, flags)
+}
+
+const fn sra(value: u8) -> (u8, Flags) {
+    let negative = (value & 0x80) != 0;
+    let new_carry = (value & 0x01) != 0;
+    let shifted = (value >> 1) | if negative { 0x80 } else { 0x00 };
+    let flags = Flags::new()
+        .with(Flag::C, new_carry)
+        .with(Flag::Z, shifted == 0);
+    (shifted, flags)
+}
+
+const fn swap(value: u8) -> (u8, Flags) {
+    let swapped = (value >> 4) | (value << 4);
+    let flags = Flags::new().with(Flag::Z, swapped == 0);
+    (swapped, flags)
+}
+
+const fn srl(value: u8) -> (u8, Flags) {
+    let new_carry = (value & 0x01) != 0;
+    let shifted = value >> 1;
+    let flags = Flags::new()
+        .with(Flag::C, new_carry)
+        .with(Flag::Z, shifted == 0);
+    (shifted, flags)
+}
+
+const fn bit_mask(bit: Bit) -> u8 {
+    1 << (bit as u8)
+}
+
+const fn bit(bit_idx: Bit, value: u8, flags: Flags) -> Flags {
+    let bit = bit_mask(bit_idx);
+    let z_flag = (bit & value) == 0;
+    flags
+        .with(Flag::N, false)
+        .with(Flag::H, true)
+        .with(Flag::Z, z_flag)
+}
+
+const fn res(bit_idx: Bit, value: u8) -> u8 {
+    value & !bit_mask(bit_idx)
+}
+
+const fn set(bit_idx: Bit, value: u8) -> u8 {
+    value | bit_mask(bit_idx)
+}
+
+const fn sign_extend(a: u8) -> u16 {
+    a as i8 as i16 as u16
+}
+
+const fn translate_reset_target(target: ResetTarget) -> u16 {
+    match target {
+        ResetTarget::Addr0x00 => 0x00,
+        ResetTarget::Addr0x08 => 0x08,
+        ResetTarget::Addr0x10 => 0x10,
+        ResetTarget::Addr0x18 => 0x18,
+        ResetTarget::Addr0x20 => 0x20,
+        ResetTarget::Addr0x28 => 0x28,
+        ResetTarget::Addr0x30 => 0x30,
+        ResetTarget::Addr0x38 => 0x38,
+    }
+}
+
+pub struct Cpu<T>
+where
+    T: Memory,
+{
     regs: Registers,
     shadow_regs: Registers,
     interrupt_regs: InterruptRegisters,
+    memory: T,
+}
+
+impl<T> Cpu<T>
+where
+    T: Memory,
+{
+    pub fn new(memory: T) -> Self {
+        Self {
+            regs: Registers::new(),
+            shadow_regs: Registers::new(),
+            interrupt_regs: InterruptRegisters::new(),
+            memory,
+        }
+    }
+
+    const fn get_regs(&self) -> &Registers {
+        // TODO: return appropriate set depending on irq context or not
+        &self.regs
+    }
+
+    fn get_mut_regs(&mut self) -> &mut Registers {
+        // TODO: return appropriate set depending on irq context or not
+        &mut self.regs
+    }
+
+    const fn get_flag(&self, flag: Flag) -> bool {
+        self.get_regs().flags.is_flag_set(flag)
+    }
+
+    const fn get_flags(&self) -> Flags {
+        self.get_regs().flags
+    }
+
+    fn set_flags(&mut self, flags: Flags) {
+        self.get_mut_regs().flags = flags;
+    }
+
+    const fn get_reg(&self, reg: Register) -> u8 {
+        let regs = self.get_regs();
+        match reg {
+            Register::A => regs.a_reg,
+            Register::B => regs.b_reg,
+            Register::C => regs.c_reg,
+            Register::D => regs.d_reg,
+            Register::E => regs.e_reg,
+            Register::H => regs.h_reg,
+            Register::L => regs.l_reg,
+        }
+    }
+
+    fn set_reg(&mut self, reg: Register, value: u8) {
+        let regs = self.get_mut_regs();
+        let target = match reg {
+            Register::A => &mut regs.a_reg,
+            Register::B => &mut regs.b_reg,
+            Register::C => &mut regs.c_reg,
+            Register::D => &mut regs.d_reg,
+            Register::E => &mut regs.e_reg,
+            Register::H => &mut regs.h_reg,
+            Register::L => &mut regs.l_reg,
+        };
+        *target = value;
+    }
+
+    const fn get_reg_pair(&self, reg: RegisterPair) -> u16 {
+        let regs = self.get_regs();
+        let (hi, lo) = match reg {
+            RegisterPair::BC => (regs.b_reg, regs.c_reg),
+            RegisterPair::DE => (regs.d_reg, regs.e_reg),
+            RegisterPair::HL => (regs.h_reg, regs.l_reg),
+            RegisterPair::SP => {
+                return regs.sp_reg;
+            }
+        };
+        ((hi as u16) << 8) | (lo as u16)
+    }
+
+    fn set_reg_pair(&mut self, reg: RegisterPair, value: u16) {
+        let regs = self.get_mut_regs();
+        let (hi, lo) = match reg {
+            RegisterPair::BC => (&mut regs.b_reg, &mut regs.c_reg),
+            RegisterPair::DE => (&mut regs.d_reg, &mut regs.e_reg),
+            RegisterPair::HL => (&mut regs.h_reg, &mut regs.l_reg),
+            RegisterPair::SP => {
+                regs.sp_reg = value;
+                return;
+            }
+        };
+        *hi = ((value >> 8) & 0xff) as u8;
+        *lo = (value & 0xff) as u8;
+    }
+
+    const fn get_reg_pair_stack(&self, reg: RegisterPairStack) -> u16 {
+        let regs = self.get_regs();
+        let (hi, lo) = match reg {
+            RegisterPairStack::BC => (regs.b_reg, regs.c_reg),
+            RegisterPairStack::DE => (regs.d_reg, regs.e_reg),
+            RegisterPairStack::HL => (regs.h_reg, regs.l_reg),
+            RegisterPairStack::AF => (regs.a_reg, regs.flags.0),
+        };
+        ((hi as u16) << 8) | (lo as u16)
+    }
+
+    fn set_reg_pair_stack(&mut self, reg: RegisterPairStack, value: u16) {
+        let regs = self.get_mut_regs();
+        let (hi, lo) = match reg {
+            RegisterPairStack::BC => (&mut regs.b_reg, &mut regs.c_reg),
+            RegisterPairStack::DE => (&mut regs.d_reg, &mut regs.e_reg),
+            RegisterPairStack::HL => (&mut regs.h_reg, &mut regs.l_reg),
+            RegisterPairStack::AF => {
+                let (hi, lo) = (&mut regs.a_reg, &mut regs.flags);
+                *hi = ((value >> 8) & 0xff) as u8;
+                *lo = ((value & 0xff) as u8).into();
+                return;
+            }
+        };
+        *hi = ((value >> 8) & 0xff) as u8;
+        *lo = (value & 0xff) as u8;
+    }
+
+    fn get_reg_pair_mem(&mut self, reg: RegisterPairMem) -> u16 {
+        let regs = self.get_regs();
+        let (hi, lo) = match reg {
+            RegisterPairMem::BC => (regs.b_reg, regs.c_reg),
+            RegisterPairMem::DE => (regs.d_reg, regs.e_reg),
+            RegisterPairMem::HLINC | RegisterPairMem::HLDEC => (regs.h_reg, regs.l_reg),
+        };
+        let value = ((hi as u16) << 8) | (lo as u16);
+
+        match reg {
+            RegisterPairMem::HLINC => {
+                self.set_reg_pair(RegisterPair::HL, value.wrapping_add(1));
+            }
+            RegisterPairMem::HLDEC => {
+                self.set_reg_pair(RegisterPair::HL, value.wrapping_sub(1));
+            }
+            _ => {}
+        }
+        value
+    }
+
+    fn step_pc(&mut self) -> u16 {
+        let regs = self.get_mut_regs();
+        let pc = regs.pc_reg;
+        regs.pc_reg = regs.pc_reg.wrapping_add(1);
+        pc
+    }
+
+    fn read_8_bit_immediate(&mut self) -> u8 {
+        let pc = self.step_pc();
+        self.memory.read(pc)
+    }
+
+    fn read_16_bit_immediate(&mut self) -> u16 {
+        let pc = self.step_pc();
+        let lo = self.memory.read(pc);
+        let pc = self.step_pc();
+        let hi = self.memory.read(pc);
+        ((hi as u16) << 8) | (lo as u16)
+    }
+
+    fn check_condition(&self, condition: Condition) -> bool {
+        match condition {
+            Condition::NZ => !self.get_flag(Flag::Z),
+            Condition::Z => self.get_flag(Flag::Z),
+            Condition::NC => !self.get_flag(Flag::C),
+            Condition::C => self.get_flag(Flag::C),
+        }
+    }
+
+    fn stack_push(&mut self, value: u16) {
+        let sp = self.get_reg_pair(RegisterPair::SP);
+        let pos = sp.wrapping_sub(1);
+        self.memory.write(pos, (value >> 8) as u8);
+        let pos = pos.wrapping_sub(1);
+        self.memory.write(pos, (value & 0xff) as u8);
+        self.set_reg_pair(RegisterPair::SP, pos);
+    }
+
+    fn stack_pop(&mut self) -> u16 {
+        let sp = self.get_reg_pair(RegisterPair::SP);
+        let pos = sp;
+        let lo = self.memory.read(pos);
+        let pos = pos.wrapping_add(1);
+        let hi = self.memory.read(pos);
+        let pos = pos.wrapping_add(1);
+        self.set_reg_pair(RegisterPair::SP, pos);
+        (lo as u16) | ((hi as u16) << 8)
+    }
+
+    fn fetch_and_decode(&mut self) -> OpCode {
+        let pc = self.step_pc();
+        let insn = self.memory.read(pc);
+
+        match decoder::decode(insn) {
+            OpCode::Prefix => {
+                let pc = self.step_pc();
+                let insn = self.memory.read(pc);
+                decoder::decode_prefixed(insn)
+            }
+            opcode => opcode,
+        }
+    }
+
+    pub fn step(&mut self) -> Cycles {
+        let instruction = self.fetch_and_decode();
+        self.execute(instruction);
+        todo!();
+    }
+
+    fn execute(&mut self, opcode: OpCode) {
+        match opcode {
+            OpCode::Prefix => {
+                panic!("Attempted to execute prefix opcode!");
+            }
+            OpCode::Nop => {}
+            OpCode::Ld8RegReg(dest, src) => {
+                let value = self.get_reg(src);
+                self.set_reg(dest, value);
+            }
+            OpCode::Ld8RegImm(dest) => {
+                let value = self.read_8_bit_immediate();
+                self.set_reg(dest, value);
+            }
+            OpCode::Ld8RegInd(dest, src) => {
+                let addr = self.get_reg_pair(src);
+                let value = self.memory.read(addr);
+                self.set_reg(dest, value);
+            }
+            OpCode::Ld8IndReg(dest, src) => {
+                let value = self.get_reg(src);
+                let addr = self.get_reg_pair(dest);
+                self.memory.write(addr, value);
+            }
+            OpCode::Ld8IndImm(dest) => {
+                let value = self.read_8_bit_immediate();
+                let addr = self.get_reg_pair(dest);
+                self.memory.write(addr, value);
+            }
+            OpCode::Ld8IndAcc(dest) => {
+                let value = self.get_reg(Register::A);
+                let addr = self.get_reg_pair_mem(dest);
+                self.memory.write(addr, value);
+            }
+            OpCode::Ld8AccInd(dest) => {
+                let addr = self.get_reg_pair_mem(dest);
+                let value = self.memory.read(addr);
+                self.set_reg(Register::A, value);
+            }
+            OpCode::Ld8ZeroPageCAcc => {
+                let regs = self.get_regs();
+                let addr = 0xFF00 | regs.c_reg as u16;
+                self.memory.write(addr, regs.a_reg);
+            }
+            OpCode::Ld8AccZeroPageC => {
+                let regs = self.get_regs();
+                let addr = 0xFF00 | regs.c_reg as u16;
+                let value = self.memory.read(addr);
+                self.get_mut_regs().a_reg = value;
+            }
+            OpCode::Ld8ZeroPageImmAcc => {
+                let imm = self.read_8_bit_immediate();
+                let addr = 0xFF00 | imm as u16;
+                self.memory.write(addr, self.get_regs().a_reg);
+            }
+            OpCode::Ld8AccZeroPageImm => {
+                let imm = self.read_8_bit_immediate();
+                let addr = 0xFF00 | imm as u16;
+                let value = self.memory.read(addr);
+                self.get_mut_regs().a_reg = value
+            }
+            OpCode::Ld8IndImmAcc => {
+                let imm = self.read_16_bit_immediate();
+                let addr = 0xFF00 | imm as u16;
+                self.memory.write(addr, self.get_regs().a_reg);
+            }
+            OpCode::Ld8AccIndImm => {
+                let imm = self.read_16_bit_immediate();
+                let addr = 0xFF00 | imm as u16;
+                let value = self.memory.read(addr);
+                self.get_mut_regs().a_reg = value
+            }
+            OpCode::Ld16RegImm(dest) => {
+                let imm = self.read_16_bit_immediate();
+                self.set_reg_pair(dest, imm);
+            }
+            OpCode::Ld16IndImmSp => {
+                let imm = self.read_16_bit_immediate();
+                let sp = self.get_reg_pair(RegisterPair::SP);
+                self.memory.write(imm, (sp & 0xff) as u8);
+                self.memory.write(imm.wrapping_add(1), (sp >> 8) as u8);
+            }
+            OpCode::Ld16HlSpImm => {
+                let sp = self.get_regs().sp_reg;
+                let imm = self.read_8_bit_immediate() as i8 as i16;
+                let value = ((sp as i16).wrapping_add(imm)) as u16;
+                self.set_reg_pair(RegisterPair::HL, value);
+
+                self.set_flags(
+                    Flags::new()
+                        .with(Flag::Z, false)
+                        .with(Flag::N, false)
+                        .with(Flag::H, carry_bit16(imm as u16, sp, value, 4))
+                        .with(Flag::C, carry_bit16(imm as u16, sp, value, 8)),
+                );
+            }
+            OpCode::Ld16SpHl => {
+                let value = self.get_reg_pair(RegisterPair::HL);
+                self.get_mut_regs().sp_reg = value;
+            }
+            OpCode::Halt => {
+                todo!()
+            }
+            OpCode::AddRegReg(dest, src) => {
+                let src_val = self.get_reg(src);
+                let dest_val = self.get_reg(dest);
+                let (result, flags) = add(src_val, dest_val, false);
+                self.set_reg(dest, result);
+                self.set_flags(flags);
+            }
+            OpCode::SubRegReg(dest, src) => {
+                let src_val = self.get_reg(src);
+                let dest_val = self.get_reg(dest);
+                let (result, flags) = sub(src_val, dest_val, false);
+                self.set_reg(dest, result);
+                self.set_flags(flags);
+            }
+            OpCode::AndRegReg(dest, src) => {
+                let src_val = self.get_reg(src);
+                let dest_val = self.get_reg(dest);
+                let (result, flags) = and(src_val, dest_val);
+                self.set_reg(dest, result);
+                self.set_flags(flags);
+            }
+            OpCode::OrRegReg(dest, src) => {
+                let src_val = self.get_reg(src);
+                let dest_val = self.get_reg(dest);
+                let (result, flags) = or(src_val, dest_val);
+                self.set_reg(dest, result);
+                self.set_flags(flags);
+            }
+            OpCode::AdcRegReg(dest, src) => {
+                let src_val = self.get_reg(src);
+                let dest_val = self.get_reg(dest);
+                let (result, flags) = add(src_val, dest_val, self.get_flag(Flag::C));
+                self.set_reg(dest, result);
+                self.set_flags(flags);
+            }
+            OpCode::SbcRegReg(dest, src) => {
+                let src_val = self.get_reg(src);
+                let dest_val = self.get_reg(dest);
+                let (result, flags) = sub(src_val, dest_val, self.get_flag(Flag::C));
+                self.set_reg(dest, result);
+                self.set_flags(flags);
+            }
+            OpCode::XorRegReg(dest, src) => {
+                let src_val = self.get_reg(src);
+                let dest_val = self.get_reg(dest);
+                let (result, flags) = xor(src_val, dest_val);
+                self.set_reg(dest, result);
+                self.set_flags(flags);
+            }
+            OpCode::CpRegReg(dest, src) => {
+                let src_val = self.get_reg(src);
+                let dest_val = self.get_reg(dest);
+                let (_, flags) = sub(src_val, dest_val, false);
+                self.set_flags(flags);
+            }
+            OpCode::AddRegPairRegPair(dest, src) => {
+                let src_val = self.get_reg_pair(src);
+                let dest_val = self.get_reg_pair(dest);
+                let (result, flags) = add16(src_val, dest_val);
+                self.set_reg_pair(dest, result);
+                self.set_flags(flags);
+            }
+            OpCode::AddAccImm => {
+                let imm = self.read_8_bit_immediate();
+                let a = self.get_reg(Register::A);
+                let (result, flags) = add(a, imm, false);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::AdcAccImm => {
+                let imm = self.read_8_bit_immediate();
+                let a = self.get_reg(Register::A);
+                let (result, flags) = add(a, imm, self.get_flag(Flag::C));
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::SubAccImm => {
+                let imm = self.read_8_bit_immediate();
+                let a = self.get_reg(Register::A);
+                let (result, flags) = sub(a, imm, false);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::SbcAccImm => {
+                let imm = self.read_8_bit_immediate();
+                let a = self.get_reg(Register::A);
+                let (result, flags) = sub(a, imm, self.get_flag(Flag::C));
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::AndAccImm => {
+                let imm = self.read_8_bit_immediate();
+                let a = self.get_reg(Register::A);
+                let (result, flags) = and(a, imm);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::OrAccImm => {
+                let imm = self.read_8_bit_immediate();
+                let a = self.get_reg(Register::A);
+                let (result, flags) = or(a, imm);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::XorAccImm => {
+                let imm = self.read_8_bit_immediate();
+                let a = self.get_reg(Register::A);
+                let (result, flags) = xor(a, imm);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::CpAccImm => {
+                let imm = self.read_8_bit_immediate();
+                let a = self.get_reg(Register::A);
+                let (_, flags) = sub(a, imm, false);
+                self.set_flags(flags);
+            }
+            OpCode::AddSpImm => {
+                // This is somewhat special as it is signed 16-bit addition
+                let imm = sign_extend(self.read_8_bit_immediate());
+                let sp = self.get_reg_pair(RegisterPair::SP);
+                let result = sp.wrapping_add(imm);
+                self.set_reg_pair(RegisterPair::SP, result);
+                self.set_flags(
+                    Flags::new()
+                        .with(Flag::H, carry_bit16(imm, sp, result, 4))
+                        .with(Flag::C, carry_bit16(imm, sp, result, 8)),
+                );
+            }
+            OpCode::AddAccHlInd => {
+                let hl = self.get_reg_pair(RegisterPair::HL);
+                let mem = self.memory.read(hl);
+                let a = self.get_reg(Register::A);
+                let (result, flags) = add(a, mem, false);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::AdcAccHlInd => {
+                let hl = self.get_reg_pair(RegisterPair::HL);
+                let mem = self.memory.read(hl);
+                let a = self.get_reg(Register::A);
+                let (result, flags) = add(a, mem, self.get_flag(Flag::C));
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::SubAccHlInd => {
+                let hl = self.get_reg_pair(RegisterPair::HL);
+                let mem = self.memory.read(hl);
+                let a = self.get_reg(Register::A);
+                let (result, flags) = sub(a, mem, false);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::SbcAccHlInd => {
+                let hl = self.get_reg_pair(RegisterPair::HL);
+                let mem = self.memory.read(hl);
+                let a = self.get_reg(Register::A);
+                let (result, flags) = sub(a, mem, self.get_flag(Flag::C));
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::AndAccHlInd => {
+                let hl = self.get_reg_pair(RegisterPair::HL);
+                let mem = self.memory.read(hl);
+                let a = self.get_reg(Register::A);
+                let (result, flags) = and(a, mem);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::XorAccHlInd => {
+                let hl = self.get_reg_pair(RegisterPair::HL);
+                let mem = self.memory.read(hl);
+                let a = self.get_reg(Register::A);
+                let (result, flags) = xor(a, mem);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::OrAccHlInd => {
+                let hl = self.get_reg_pair(RegisterPair::HL);
+                let mem = self.memory.read(hl);
+                let a = self.get_reg(Register::A);
+                let (result, flags) = or(a, mem);
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
+            }
+            OpCode::CpAccHlInd => {
+                let hl = self.get_reg_pair(RegisterPair::HL);
+                let mem = self.memory.read(hl);
+                let a = self.get_reg(Register::A);
+                let (_, flags) = sub(a, mem, false);
+                self.set_flags(flags);
+            }
+            OpCode::IncReg(reg) => {
+                let val = self.get_reg(reg).wrapping_add(1);
+                self.set_reg(reg, val);
+                self.set_flags(
+                    self.get_flags()
+                        .with(Flag::Z, val == 0)
+                        .with(Flag::N, false)
+                        .with(Flag::H, val == 0x10),
+                );
+            }
+            OpCode::DecReg(reg) => {
+                let minus_one = 0xff;
+                let prev = self.get_reg(reg);
+                let next = prev.wrapping_add(minus_one);
+                self.set_reg(reg, next);
+                self.set_flags(
+                    self.get_flags()
+                        .with(Flag::Z, next == 0)
+                        .with(Flag::N, false)
+                        // FIXME: is this the correct behavior?
+                        .with(Flag::H, carry_bit8(minus_one, prev, next, 4)),
+                );
+            }
+            OpCode::IncRegPair(reg) => {
+                let prev = self.get_reg_pair(reg);
+                let next = prev.wrapping_add(1);
+                self.set_reg_pair(reg, next);
+            }
+            OpCode::DecRegPair(reg) => {
+                let prev = self.get_reg_pair(reg);
+                let next = prev.wrapping_sub(1);
+                self.set_reg_pair(reg, next);
+            }
+            OpCode::IncIndHl => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let val = self.memory.read(addr);
+                let val = val.wrapping_add(1);
+                self.memory.write(addr, val);
+                self.set_flags(
+                    self.get_flags()
+                        .with(Flag::Z, val == 0)
+                        .with(Flag::N, false)
+                        .with(Flag::H, val == 0x10),
+                );
+            }
+            OpCode::DecIndHl => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let minus_one = 0xff;
+                let prev = self.memory.read(addr);
+                let next = prev.wrapping_add(minus_one);
+                self.memory.write(addr, next);
+                self.set_flags(
+                    self.get_flags()
+                        .with(Flag::Z, next == 0)
+                        .with(Flag::N, false)
+                        // FIXME: is this the correct behavior?
+                        .with(Flag::H, carry_bit8(minus_one, prev, next, 4)),
+                );
+            }
+            OpCode::Daa => {
+                todo!();
+            }
+            OpCode::Cpl => {
+                let a = self.get_reg(Register::A);
+                let complement = !a;
+                self.set_reg(Register::A, complement);
+                self.set_flags(self.get_flags().with(Flag::N, true).with(Flag::H, true));
+            }
+            OpCode::Scf => {
+                self.set_flags(self.get_flags().with(Flag::C, true));
+            }
+            OpCode::Ccf => {
+                let flags = self.get_flags();
+                self.set_flags(flags.with(Flag::C, !flags.is_flag_set(Flag::C)));
+            }
+            OpCode::JrImm => {
+                let target_offset = self.read_16_bit_immediate() as i16;
+                let pc = self.get_regs().pc_reg;
+                let target = (pc as i16).wrapping_add(target_offset) as u16;
+                self.get_mut_regs().pc_reg = target;
+            }
+            OpCode::JrCondImm(condition) => {
+                let target_offset = self.read_16_bit_immediate() as i16;
+                if self.check_condition(condition) {
+                    let pc = self.get_regs().pc_reg;
+                    let target = (pc as i16).wrapping_add(target_offset) as u16;
+                    self.get_mut_regs().pc_reg = target;
+                }
+            }
+            OpCode::Stop => {
+                todo!()
+            }
+            OpCode::RetCond(condition) => {
+                if self.check_condition(condition) {
+                    let value = self.stack_pop();
+                    self.get_mut_regs().pc_reg = value;
+                }
+            }
+            OpCode::Ret => {
+                let value = self.stack_pop();
+                self.get_mut_regs().pc_reg = value;
+            }
+            OpCode::Reti => {
+                let value = self.stack_pop();
+                self.get_mut_regs().pc_reg = value;
+                todo!("set ime reg")
+            }
+            OpCode::JpCondImm(condition) => {
+                let target = self.read_16_bit_immediate();
+                if self.check_condition(condition) {
+                    self.get_mut_regs().pc_reg = target;
+                }
+            }
+            OpCode::JpImm => {
+                let target = self.read_16_bit_immediate();
+                self.get_mut_regs().pc_reg = target;
+            }
+            OpCode::JpHl => {
+                let target = self.get_reg_pair(RegisterPair::HL);
+                self.get_mut_regs().pc_reg = target;
+            }
+            OpCode::CallCondImm(condition) => {
+                let target = self.read_16_bit_immediate();
+                if self.check_condition(condition) {
+                    let return_addr = self.get_regs().pc_reg;
+                    self.stack_push(return_addr);
+                    self.get_mut_regs().pc_reg = target;
+                }
+            }
+            OpCode::CallImm => {
+                let target = self.read_16_bit_immediate();
+                let return_addr = self.get_regs().pc_reg;
+                self.stack_push(return_addr);
+                self.get_mut_regs().pc_reg = target;
+            }
+            OpCode::Reset(target) => {
+                let target = translate_reset_target(target);
+                let return_addr = self.get_regs().pc_reg;
+                self.stack_push(return_addr);
+                self.get_mut_regs().pc_reg = target;
+            }
+            OpCode::Pop(reg) => {
+                let value = self.stack_pop();
+                self.set_reg_pair_stack(reg, value);
+            }
+            OpCode::Push(reg) => {
+                let value = self.get_reg_pair_stack(reg);
+                self.stack_push(value);
+            }
+            OpCode::Di => {
+                todo!()
+            }
+            OpCode::Ei => {
+                todo!()
+            }
+            OpCode::Illegal => {
+                todo!()
+            }
+            OpCode::RlcReg(register) => {
+                let (shifted, flags) = rlc(self.get_reg(register));
+                self.set_reg(register, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::RrcReg(register) => {
+                let (shifted, flags) = rrc(self.get_reg(register));
+                self.set_reg(register, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::RlReg(register) => {
+                let (shifted, flags) = rl(self.get_reg(register), self.get_flag(Flag::C));
+                self.set_reg(register, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::RrReg(register) => {
+                let (shifted, flags) = rr(self.get_reg(register), self.get_flag(Flag::C));
+                self.set_reg(register, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::SlaReg(register) => {
+                let (shifted, flags) = sla(self.get_reg(register));
+                self.set_reg(register, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::SraReg(register) => {
+                let (shifted, flags) = sra(self.get_reg(register));
+                self.set_reg(register, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::SwapReg(register) => {
+                let (shifted, flags) = swap(self.get_reg(register));
+                self.set_reg(register, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::SrlReg(register) => {
+                let (shifted, flags) = srl(self.get_reg(register));
+                self.set_reg(register, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::Bit(bit_idx, register) => {
+                let flags = bit(bit_idx, self.get_reg(register), self.get_flags());
+                self.set_flags(flags);
+            }
+            OpCode::Res(bit_idx, register) => {
+                let value = res(bit_idx, self.get_reg(register));
+                self.set_reg(register, value);
+            }
+            OpCode::Set(bit_idx, register) => {
+                let value = set(bit_idx, self.get_reg(register));
+                self.set_reg(register, value);
+            }
+            OpCode::RlcHlInd => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let (shifted, flags) = rlc(self.memory.read(addr));
+                self.memory.write(addr, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::RrcHlInd => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let (shifted, flags) = rrc(self.memory.read(addr));
+                self.memory.write(addr, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::RlHlInd => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let (shifted, flags) = rl(self.memory.read(addr), self.get_flag(Flag::C));
+                self.memory.write(addr, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::RrHlInd => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let (shifted, flags) = rr(self.memory.read(addr), self.get_flag(Flag::C));
+                self.memory.write(addr, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::SlaHlInd => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let (shifted, flags) = sla(self.memory.read(addr));
+                self.memory.write(addr, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::SraHlInd => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let (shifted, flags) = sra(self.memory.read(addr));
+                self.memory.write(addr, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::SwapHlInd => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let (shifted, flags) = swap(self.memory.read(addr));
+                self.memory.write(addr, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::SrlHlInd => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let (shifted, flags) = srl(self.memory.read(addr));
+                self.memory.write(addr, shifted);
+                self.set_flags(flags);
+            }
+            OpCode::BitHlInd(bit_idx) => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let flags = bit(bit_idx, self.memory.read(addr), self.get_flags());
+                self.set_flags(flags);
+            }
+            OpCode::ResHlInd(bit_idx) => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let value = res(bit_idx, self.memory.read(addr));
+                self.memory.write(addr, value);
+            }
+            OpCode::SetHlInd(bit_idx) => {
+                let addr = self.get_reg_pair(RegisterPair::HL);
+                let value = set(bit_idx, self.memory.read(addr));
+                self.memory.write(addr, value);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+
+    #[test]
+    pub fn test_sign_extend() {
+        assert_eq!(sign_extend(0x80u8), 0xFF80u16);
+        assert_eq!(sign_extend(0x7fu8), 0x007fu16);
+    }
 }

@@ -1,5 +1,6 @@
 use sm83_decoder_macros::generate_decoder_tables;
 
+#[derive(Debug, Clone, Copy)]
 pub enum OpCode {
     Ld8RegReg(Register, Register),                 // ld Register, Register
     Ld8RegImm(Register),                           // ld Register, n8
@@ -27,7 +28,7 @@ pub enum OpCode {
     SbcRegReg(Register, Register),                 // sbc Register, Register
     XorRegReg(Register, Register),                 // xor Register, Register
     CpRegReg(Register, Register),                  // cp Register, Register
-    AddRegPairRegPair(RegisterPair, RegisterPair), // add Register, Register
+    AddRegPairRegPair(RegisterPair, RegisterPair), // add RegisterPair, RegisterPair
     AddAccImm,                                     // add A, n8
     AdcAccImm,                                     // adc A, n8
     SubAccImm,                                     // sub A, n8
@@ -53,10 +54,6 @@ pub enum OpCode {
     DecIndHl,                                      // dec [HL]
     Prefix,                                        // prefix
     Nop,                                           // nop
-    Rlca,                                          // rlca
-    Rrca,                                          // rrca
-    Rla,                                           // rla
-    Rra,                                           // rra
     Daa,                                           // daa
     Cpl,                                           // cpl
     Scf,                                           // scf
@@ -87,8 +84,8 @@ pub enum OpCode {
     SwapReg(Register),                             // swap Register
     SrlReg(Register),                              // srl Register
     Bit(Bit, Register),                            // bit #bit, Register
-    Res(Bit, Register),                            // srl #bit, Register
-    Set(Bit, Register),                            // srl #bit, Register
+    Res(Bit, Register),                            // res #bit, Register
+    Set(Bit, Register),                            // set #bit, Register
     RlcHlInd,                                      // rlc [HL]
     RrcHlInd,                                      // rrc [HL]
     RlHlInd,                                       // rl [HL]
@@ -187,10 +184,10 @@ generate_decoder_tables! {
         [R: RegisterPair] "00RR0011" => { OpCode::IncRegPair(#R) },
         [R: RegisterPair] "00RR1011" => { OpCode::DecRegPair(#R) },
         [R: RegisterPair] "00RR1001" => { OpCode::AddRegPairRegPair(RegisterPair::HL, #R) },
-        [] "00000111" => { OpCode::Rlca },
-        [] "00001111" => { OpCode::Rrca },
-        [] "00010111" => { OpCode::Rla },
-        [] "00011111" => { OpCode::Rra },
+        [] "00000111" => { OpCode::RlcReg(Register::A) },
+        [] "00001111" => { OpCode::RrcReg(Register::A) },
+        [] "00010111" => { OpCode::RlReg(Register::A) },
+        [] "00011111" => { OpCode::RrReg(Register::A) },
         [] "00100111" => { OpCode::Daa },
         [] "00101111" => { OpCode::Cpl },
         [] "00110111" => { OpCode::Scf },
@@ -276,4 +273,12 @@ generate_decoder_tables! {
         [b: Bit] "10bbb110" => { OpCode::ResHlInd(#b) },
         [b: Bit] "11bbb110" => { OpCode::SetHlInd(#b) },
     },
+}
+
+pub fn decode(byte: u8) -> OpCode {
+    DECODER_TABLE[byte as usize]
+}
+
+pub fn decode_prefixed(byte: u8) -> OpCode {
+    PREFIXED_TABLE[byte as usize]
 }
