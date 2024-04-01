@@ -196,6 +196,39 @@ const fn xor(a: u8, b: u8) -> (u8, Flags) {
     (result, flags)
 }
 
+const fn daa(a: u8, flags: Flags) -> (u8, Flags) {
+    let mut result = a;
+    let mut carry = false;
+
+    if flags.is_flag_set(Flag::N) {
+        // Adjust subtraction
+        carry = flags.is_flag_set(Flag::C);
+        let correction = match (flags.is_flag_set(Flag::C), flags.is_flag_set(Flag::H)) {
+            (false, false) => 0,
+            (true, false) => (!0x60u8).wrapping_add(1), // 2's complement of corresponding value
+            (false, true) => (!0x06u8).wrapping_add(1),
+            (true, true) => (!0x66u8).wrapping_add(1),
+        };
+        result = result.wrapping_add(correction);
+    } else {
+        // Adjust addition
+        if ((a & 0xf) > 9) || flags.is_flag_set(Flag::H) {
+            result = result.wrapping_add(0x06);
+        }
+
+        if (a > 0x99) || flags.is_flag_set(Flag::C) {
+            result = result.wrapping_add(0x60);
+            carry = true;
+        }
+    }
+
+    let flags = flags
+        .with(Flag::Z, result == 0)
+        .with(Flag::H, false)
+        .with(Flag::C, carry);
+    (result, flags)
+}
+
 const fn rlc(value: u8) -> (u8, Flags) {
     let carry = (value & 0x80) != 0;
     let mut shifted = value << 1;
@@ -881,7 +914,10 @@ where
                 );
             }
             OpCode::Daa => {
-                todo!();
+                let a = self.get_reg(Register::A);
+                let (result, flags) = daa(a, self.get_flags());
+                self.set_reg(Register::A, result);
+                self.set_flags(flags);
             }
             OpCode::Cpl => {
                 let a = self.get_reg(Register::A);
@@ -1106,5 +1142,29 @@ pub mod test {
     pub fn test_sign_extend() {
         assert_eq!(sign_extend(0x80u8), 0xFF80u16);
         assert_eq!(sign_extend(0x7fu8), 0x007fu16);
+    }
+
+    #[test]
+    pub fn test_daa() {
+        assert_eq!(daa(0x23, Flags::new()), (0x23, Flags::new()));
+        assert_eq!(daa(0x29, Flags::new()), (0x29, Flags::new()));
+        assert_eq!(
+            daa(0x00, Flags::new()),
+            (0x00, Flags::new().with(Flag::Z, true))
+        );
+        assert_eq!(
+            daa(0x9A, Flags::new()),
+            (0x00, Flags::new().with(Flag::Z, true).with(Flag::C, true))
+        );
+
+        assert_eq!(
+            daa(0xB3, Flags::new()),
+            (0x13, Flags::new().with(Flag::C, true))
+        );
+
+        assert_eq!(
+            daa(0xBF, Flags::new()),
+            (0x25, Flags::new().with(Flag::C, true))
+        );
     }
 }
