@@ -3,28 +3,8 @@ use crate::{
         self, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairMem, RegisterPairStack,
         ResetTarget,
     },
-    memory::{Address, Memory},
+    memory::Memory,
 };
-
-struct InterruptRegisters {
-    iff1: bool,
-    iff2: bool,
-}
-
-impl Default for InterruptRegisters {
-    fn default() -> Self {
-        Self {
-            iff1: false,
-            iff2: false,
-        }
-    }
-}
-
-impl InterruptRegisters {
-    fn new() -> Self {
-        Self::default()
-    }
-}
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]
@@ -35,7 +15,7 @@ pub enum Flag {
     C = 1 << 4,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Flags(u8);
 
 impl Default for Flags {
@@ -87,6 +67,7 @@ struct Registers {
     l_reg: u8,
     sp_reg: u16,
     pc_reg: u16,
+    irq_en: bool, // IME register
 }
 
 impl Default for Registers {
@@ -110,12 +91,10 @@ impl Registers {
             sp_reg: 0,
             // TODO: check what the reset vector should be
             pc_reg: 0,
+            irq_en: false,
         }
     }
 }
-
-#[derive(Debug, Clone, Copy)]
-pub struct Cycles(usize);
 
 const fn carry_bit8(a: u8, b: u8, c: u8, bit: usize) -> bool {
     assert!(bit < 8);
@@ -164,7 +143,7 @@ const fn add16(a: u16, b: u16) -> (u16, Flags) {
 }
 
 const fn sub(a: u8, b: u8, carry: bool) -> (u8, Flags) {
-    let carry = if carry { 1 } else { 0 };
+    let carry = carry as u8;
     let result = a.wrapping_sub(b).wrapping_sub(carry);
 
     let flags = Flags::new()
@@ -341,14 +320,114 @@ const fn translate_reset_target(target: ResetTarget) -> u16 {
     }
 }
 
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Interrupt {
+    Vblank = 0x01,
+    Lcd = 0x02,
+    Timer = 0x04,
+    Serial = 0x08,
+    Joypad = 0x10,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct Interrupts(u8);
+
+impl From<Interrupt> for Interrupts {
+    fn from(value: Interrupt) -> Self {
+        Self(value as u8)
+    }
+}
+
+impl core::ops::BitOr<Self> for Interrupts {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl core::ops::BitOr<Interrupt> for Interrupts {
+    type Output = Self;
+    fn bitor(self, rhs: Interrupt) -> Self::Output {
+        Self(self.0 | rhs as u8)
+    }
+}
+
+impl core::ops::BitAnd<Self> for Interrupts {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
+    }
+}
+
+const ALL_INTERRUPTS: Interrupts = Interrupts(
+    (Interrupt::Vblank as u8)
+        | (Interrupt::Lcd as u8)
+        | (Interrupt::Timer as u8)
+        | (Interrupt::Lcd as u8)
+        | (Interrupt::Joypad as u8),
+);
+
+impl core::ops::Not for Interrupts {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self(!self.0 & ALL_INTERRUPTS.0)
+    }
+}
+
+impl Interrupts {
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    pub fn highest_priority(self) -> Option<Interrupt> {
+        let trailing_zeros = self.0.trailing_zeros();
+        match trailing_zeros {
+            0 => Some(Interrupt::Vblank),
+            1 => Some(Interrupt::Lcd),
+            2 => Some(Interrupt::Timer),
+            3 => Some(Interrupt::Serial),
+            4 => Some(Interrupt::Joypad),
+            _ => None,
+        }
+    }
+
+    pub fn acknowledge(self, other: Interrupt) -> Self {
+        let other: Interrupts = other.into();
+        self & !other
+    }
+
+    pub fn has_any(self) -> bool {
+        self.0 != 0
+    }
+}
+
+const fn translate_irq_target(interrupt: Interrupt) -> u16 {
+    match interrupt {
+        Interrupt::Vblank => 0x40,
+        Interrupt::Lcd => 0x48,
+        Interrupt::Timer => 0x50,
+        Interrupt::Serial => 0x58,
+        Interrupt::Joypad => 0x60,
+    }
+}
+
+pub enum ExitReason {
+    Step,
+    InterruptTaken(Interrupt),
+    Stop,
+    Halt,
+    IllegalOpcode,
+}
+
 pub struct Cpu<T>
 where
     T: Memory,
 {
     regs: Registers,
-    shadow_regs: Registers,
-    interrupt_regs: InterruptRegisters,
     memory: T,
+    halted: bool,
 }
 
 impl<T> Cpu<T>
@@ -358,19 +437,16 @@ where
     pub fn new(memory: T) -> Self {
         Self {
             regs: Registers::new(),
-            shadow_regs: Registers::new(),
-            interrupt_regs: InterruptRegisters::new(),
             memory,
+            halted: false,
         }
     }
 
     const fn get_regs(&self) -> &Registers {
-        // TODO: return appropriate set depending on irq context or not
         &self.regs
     }
 
     fn get_mut_regs(&mut self) -> &mut Registers {
-        // TODO: return appropriate set depending on irq context or not
         &mut self.regs
     }
 
@@ -553,17 +629,46 @@ where
         }
     }
 
-    pub fn step(&mut self) -> Cycles {
-        let instruction = self.fetch_and_decode();
-        self.execute(instruction);
-        todo!();
+    pub fn step(&mut self, interrupts: Interrupts) -> ExitReason {
+        // TODO: Implement cycle counting
+        if self.halted && !interrupts.has_any() {
+            return ExitReason::Halt;
+        }
+        self.halted = false;
+
+        if let Some(irq) =
+            interrupts
+                .highest_priority()
+                .and_then(|irq| if self.regs.irq_en { Some(irq) } else { None })
+        {
+            self.regs.irq_en = false;
+            let return_addr = self.get_regs().pc_reg;
+            self.stack_push(return_addr);
+            self.get_mut_regs().pc_reg = translate_irq_target(irq);
+            ExitReason::InterruptTaken(irq)
+        } else {
+            let instruction = self.fetch_and_decode();
+            let exit_reason = self.execute(instruction);
+            exit_reason
+        }
     }
 
-    fn execute(&mut self, opcode: OpCode) {
+    fn execute(&mut self, opcode: OpCode) -> ExitReason {
         match opcode {
             OpCode::Prefix => {
                 panic!("Attempted to execute prefix opcode!");
             }
+            OpCode::Halt => {
+                self.halted = true;
+                return ExitReason::Halt;
+            }
+            OpCode::Stop => {
+                return ExitReason::Stop;
+            }
+            OpCode::Illegal => {
+                return ExitReason::IllegalOpcode;
+            }
+            // All instructions below use ExitReason::Step
             OpCode::Nop => {}
             OpCode::Ld8RegReg(dest, src) => {
                 let value = self.get_reg(src);
@@ -658,9 +763,6 @@ where
             OpCode::Ld16SpHl => {
                 let value = self.get_reg_pair(RegisterPair::HL);
                 self.get_mut_regs().sp_reg = value;
-            }
-            OpCode::Halt => {
-                todo!()
             }
             OpCode::AddRegReg(dest, src) => {
                 let src_val = self.get_reg(src);
@@ -946,9 +1048,6 @@ where
                     self.get_mut_regs().pc_reg = target;
                 }
             }
-            OpCode::Stop => {
-                todo!()
-            }
             OpCode::RetCond(condition) => {
                 if self.check_condition(condition) {
                     let value = self.stack_pop();
@@ -961,8 +1060,9 @@ where
             }
             OpCode::Reti => {
                 let value = self.stack_pop();
-                self.get_mut_regs().pc_reg = value;
-                todo!("set ime reg")
+                let regs = self.get_mut_regs();
+                regs.pc_reg = value;
+                regs.irq_en = true;
             }
             OpCode::JpCondImm(condition) => {
                 let target = self.read_16_bit_immediate();
@@ -1007,13 +1107,11 @@ where
                 self.stack_push(value);
             }
             OpCode::Di => {
-                todo!()
+                self.get_mut_regs().irq_en = false;
             }
             OpCode::Ei => {
-                todo!()
-            }
-            OpCode::Illegal => {
-                todo!()
+                // TODO: make this delayed by 1 instruction
+                self.get_mut_regs().irq_en = true;
             }
             OpCode::RlcReg(register) => {
                 let (shifted, flags) = rlc(self.get_reg(register));
@@ -1130,7 +1228,8 @@ where
                 let value = set(bit_idx, self.memory.read(addr));
                 self.memory.write(addr, value);
             }
-        }
+        };
+        ExitReason::Step
     }
 }
 
