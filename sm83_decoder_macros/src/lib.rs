@@ -40,11 +40,7 @@ impl Parse for DecodingStatement {
 
         let mut known_vars = vec![];
         for var_decl in &var_decls {
-            if known_vars
-                .iter()
-                .find(|v| **v == var_decl.var_ident)
-                .is_some()
-            {
+            if known_vars.iter().any(|v| *v == var_decl.var_ident) {
                 return Err(syn::Error::new(
                     var_decl.var_ident.span(),
                     "Variable redefined",
@@ -76,7 +72,7 @@ struct Field<'a> {
 
 impl<'a> Field<'a> {
     fn value_mask(&self) -> usize {
-        return 1 << (self.msb - self.lsb + 1);
+        1 << (self.msb - self.lsb + 1)
     }
 }
 
@@ -91,7 +87,6 @@ impl DecodingStatement {
 
         let msb = bit_pattern_str
             .chars()
-            .into_iter()
             .enumerate()
             .find(|(_, c)| *c == expected_char)
             .map(|(idx, _)| bit_pattern_str.len() - idx - 1);
@@ -104,7 +99,6 @@ impl DecodingStatement {
         let lsb = bit_pattern_str
             .chars()
             .rev()
-            .into_iter()
             .enumerate()
             .find(|(_, c)| *c == expected_char)
             .map(|(idx, _)| idx);
@@ -117,10 +111,9 @@ impl DecodingStatement {
         let is_range_contiguous = bit_pattern_str
             .chars()
             .rev()
-            .into_iter()
             .skip(lsb)
             .take(msb - lsb + 1)
-            .fold(true, |valid, current| valid && (current == expected_char));
+            .all(|current| current == expected_char);
 
         if !is_range_contiguous {
             let message = format!("Bit pattern is not contiguous! `{}`", expected_char);
@@ -156,7 +149,6 @@ impl DecodingStatement {
     }
 
     fn map_tokens(
-        &self,
         stream: TokenStream,
         replacements: &HashMap<char, TokenStream>,
     ) -> syn::Result<TokenStream> {
@@ -188,7 +180,7 @@ impl DecodingStatement {
                     result.extend((*replacement).clone());
                 }
                 TokenTree::Group(group) => {
-                    let inner = self.map_tokens(group.stream(), replacements)?;
+                    let inner = Self::map_tokens(group.stream(), replacements)?;
                     let delimiter = group.delimiter();
                     let stream = match delimiter {
                         proc_macro2::Delimiter::Brace => quote::quote! {
@@ -231,7 +223,7 @@ impl DecodingStatement {
             replacements.insert(*var_name, stream);
         }
 
-        self.map_tokens(self.body.clone(), &replacements)
+        Self::map_tokens(self.body.clone(), &replacements)
     }
 
     fn generate_map_entries(
@@ -250,7 +242,6 @@ impl DecodingStatement {
 
             zeroed_pattern = zeroed_pattern
                 .chars()
-                .into_iter()
                 .enumerate()
                 .map(|(idx, c)| {
                     if idx >= field.lsb && idx <= field.msb {
@@ -281,8 +272,7 @@ impl DecodingStatement {
                     .ty
                     .values
                     .iter()
-                    .skip(*index)
-                    .next()
+                    .nth(*index)
                     .expect("Invalid field index! This is a bug in the macro!")
                     .value
                     .base10_parse()?;
@@ -350,14 +340,14 @@ impl Parse for Declaration {
 
         for decl_val in values.iter() {
             let label = decl_val.label.to_string();
-            if known_labels.iter().find(|v| *v == &label).is_some() {
+            if known_labels.iter().any(|v| v == &label) {
                 return Err(syn::Error::new(decl_val.label.span(), "Duplicated tag"));
             } else {
                 known_labels.push(label);
             }
 
             let value: usize = decl_val.value.base10_parse()?;
-            if known_values.iter().find(|v| **v == value).is_some() {
+            if known_values.iter().any(|v| *v == value) {
                 return Err(syn::Error::new(decl_val.value.span(), "Duplicated value"));
             } else {
                 known_values.push(value);
@@ -389,11 +379,7 @@ impl Parse for Declarations {
 
         let mut known_names: Vec<syn::Ident> = vec![];
         for decl in &decls {
-            if known_names
-                .iter()
-                .find(|n: &&syn::Ident| **n == decl.ident)
-                .is_some()
-            {
+            if known_names.iter().any(|n: &syn::Ident| *n == decl.ident) {
                 let err = syn::Error::new(decl.ident.span(), "Duplicated declaration");
                 return Err(err);
             }
@@ -406,10 +392,7 @@ impl Parse for Declarations {
 
 impl Declarations {
     fn find_type(&self, ty: &syn::Ident) -> Option<&Declaration> {
-        return self
-            .decls
-            .iter()
-            .find(|d| d.ident.to_string() == ty.to_string());
+        return self.decls.iter().find(|d| d.ident == *ty);
     }
 }
 
@@ -509,7 +492,6 @@ impl DecoderTables {
             #enum_decls
             #(#table_decls)*
         }
-        .into()
     }
 
     fn generate_enum_decls(&self) -> TokenStream {
@@ -532,7 +514,7 @@ impl DecoderTables {
             };
             stream.extend(enum_tokens);
         }
-        stream.into()
+        stream
     }
 }
 

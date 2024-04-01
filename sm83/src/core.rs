@@ -30,9 +30,9 @@ impl From<u8> for Flags {
     }
 }
 
-impl Into<u8> for Flags {
-    fn into(self) -> u8 {
-        self.0
+impl From<Flags> for u8 {
+    fn from(flags: Flags) -> u8 {
+        flags.0
     }
 }
 
@@ -376,8 +376,14 @@ impl core::ops::Not for Interrupts {
     }
 }
 
+impl Default for Interrupts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Interrupts {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(0)
     }
 
@@ -648,8 +654,7 @@ where
             ExitReason::InterruptTaken(irq)
         } else {
             let instruction = self.fetch_and_decode();
-            let exit_reason = self.execute(instruction);
-            exit_reason
+            self.execute(instruction)
         }
     }
 
@@ -727,12 +732,12 @@ where
             }
             OpCode::Ld8IndImmAcc => {
                 let imm = self.read_16_bit_immediate();
-                let addr = 0xFF00 | imm as u16;
+                let addr = 0xFF00 | imm;
                 self.memory.write(addr, self.get_regs().a_reg);
             }
             OpCode::Ld8AccIndImm => {
                 let imm = self.read_16_bit_immediate();
-                let addr = 0xFF00 | imm as u16;
+                let addr = 0xFF00 | imm;
                 let value = self.memory.read(addr);
                 self.get_mut_regs().a_reg = value
             }
