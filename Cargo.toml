@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+    "ppu",
     "sm83",
     "sm83_decoder_macros",
 ]
