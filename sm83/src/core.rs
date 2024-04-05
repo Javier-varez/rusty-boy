@@ -87,9 +87,7 @@ impl Registers {
             e_reg: 0,
             h_reg: 0,
             l_reg: 0,
-            // TODO: check what this should be initialized to
             sp_reg: 0,
-            // TODO: check what the reset vector should be
             pc_reg: 0,
             irq_en: false,
         }
@@ -128,13 +126,12 @@ const fn add(a: u8, b: u8, carry: bool) -> (u8, Flags) {
     (result as u8, flags)
 }
 
-const fn add16(a: u16, b: u16) -> (u16, Flags) {
+const fn add16(a: u16, b: u16, flags: Flags) -> (u16, Flags) {
     let a = a as u32;
     let b = b as u32;
     let result = a + b;
 
-    let flags = Flags::new()
-        .with(Flag::Z, result == 0) // TODO: should it set the zero flag?
+    let flags = flags
         .with(Flag::N, false)
         .with(Flag::H, carry_bit32(a, b, result, 12))
         .with(Flag::C, carry_bit32(a, b, result, 16));
@@ -419,11 +416,19 @@ const fn translate_irq_target(interrupt: Interrupt) -> u16 {
     }
 }
 
+pub struct Cycles(usize);
+
+impl From<usize> for Cycles {
+    fn from(value: usize) -> Self {
+        Self(value)
+    }
+}
+
 pub enum ExitReason {
-    Step,
+    Step(Cycles),
     InterruptTaken(Interrupt),
-    Stop,
-    Halt,
+    Stop(Cycles),
+    Halt(Cycles),
     IllegalOpcode,
 }
 
@@ -665,10 +670,10 @@ where
             }
             OpCode::Halt => {
                 self.halted = true;
-                return ExitReason::Halt;
+                return ExitReason::Halt(4.into());
             }
             OpCode::Stop => {
-                return ExitReason::Stop;
+                return ExitReason::Stop(4.into());
             }
             OpCode::Illegal => {
                 return ExitReason::IllegalOpcode;
@@ -827,7 +832,7 @@ where
             OpCode::AddRegPairRegPair(dest, src) => {
                 let src_val = self.get_reg_pair(src);
                 let dest_val = self.get_reg_pair(dest);
-                let (result, flags) = add16(src_val, dest_val);
+                let (result, flags) = add16(src_val, dest_val, self.get_flags());
                 self.set_reg_pair(dest, result);
                 self.set_flags(flags);
             }
