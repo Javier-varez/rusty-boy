@@ -417,17 +417,38 @@ const fn translate_irq_target(interrupt: Interrupt) -> u16 {
 }
 
 /// Clock cycles, not machine cycles
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cycles(usize);
 
 impl Cycles {
-    const fn new(value: usize) -> Self {
+    /// Creates a Cycles instance with the given number of cycles
+    pub const fn new(value: usize) -> Self {
         Self(value)
+    }
+
+    /// Wraps around the given maximum value
+    pub fn wrap(&self, max: usize) -> Cycles {
+        Self(self.0 % max)
+    }
+}
+
+impl core::ops::Add<Cycles> for Cycles {
+    type Output = Cycles;
+
+    fn add(self, rhs: Cycles) -> Self::Output {
+        Self(self.0 + rhs.0)
     }
 }
 
 impl From<usize> for Cycles {
     fn from(value: usize) -> Self {
         Self(value)
+    }
+}
+
+impl From<Cycles> for usize {
+    fn from(value: Cycles) -> Self {
+        value.0
     }
 }
 

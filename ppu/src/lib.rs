@@ -1,47 +1,84 @@
-#![no_std]
+pub mod modes;
+pub mod oam;
+pub mod regs;
+pub mod vram;
 
-mod modes;
+use modes::Mode;
+use oam::Oam;
+use regs::Registers;
+use sm83::core::Cycles;
+use vram::Vram;
 
-use static_assertions::const_assert_eq;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Color {
+    White = 0,
+    LightGrey = 1,
+    DarkGrey = 2,
+    Black = 3,
+}
 
-/// The width of the GameBoy display in pixels
-pub const DISPLAY_WIDTH: usize = 160;
+const DISPLAY_WIDTH: usize = 160;
+const DISPLAY_HEIGHT: usize = 144;
 
-/// The height of the GameBoy display in pixels
-pub const DISPLAY_HEIGHT: usize = 144;
-
-/// The width of a single tile in pixels
-pub const TILE_WIDTH: usize = 8;
-
-/// The height of a single tile in pixels
-pub const TILE_HEIGHT: usize = 8;
-
-/// Number of bits used to represent one pixel inside a tile
-pub const BITS_PER_PIXEL: usize = 2;
-
-/// Represents an object on top of the background and window.
-struct Object {}
-
-/// The size of the VRAM in bytes (6 KiB)
-const VRAM_SIZE: usize = 0x1800;
-
-pub struct PixelColor(u8);
-
-// A single line of a tile
-#[repr(C)]
-pub struct TileLine(u16);
-
-const_assert_eq!(
-    core::mem::size_of::<TileLine>() * 8,
-    TILE_WIDTH * BITS_PER_PIXEL
-);
-
-/// 16 bytes, 2 bytes per line. Top line to bottom line.
-#[repr(C)]
-pub struct Tile([TileLine; TILE_HEIGHT]);
+pub enum PpuResult {
+    InProgress(Mode),
+}
 
 /// The Picture Processing Unit
-pub struct PPU {
-    // Memory range: 0x8000–0x97FF
-    vram: [u8; VRAM_SIZE],
+pub struct Ppu {
+    vram: Vram,
+    regs: Registers,
+    oam: Oam,
+
+    mode: Mode,
+    cycles: Cycles,
+
+    /// Origin of coordinates is top-left pixel.
+    framebuffer: [[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
+}
+
+const CYCLES_PER_FRAME: usize = 70224;
+
+impl Ppu {
+    /// Constructs a PPU instance
+    pub const fn new() -> Self {
+        Self {
+            vram: Vram::new(),
+            regs: Registers::new(),
+            oam: Oam::new(),
+
+            mode: Mode::OamScan,
+            cycles: Cycles::new(0),
+            framebuffer: [[Color::White; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
+        }
+    }
+
+    /// Runs the PPU for the given number of cycles and then returns the PPU state
+    pub fn run(&mut self, cycles: Cycles) -> PpuResult {
+        self.cycles = self.cycles + cycles;
+
+        PpuResult::InProgress(self.mode)
+    }
+}
+
+impl sm83::memory::Memory for Ppu {
+    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+        match address {
+            0x8000..=0x9FFF => self.vram.read(address),
+            0xFF40..=0xFF4B => self.regs.read(address),
+            _ => {
+                panic!("Unmapped address in PPU: {address}")
+            }
+        }
+    }
+
+    fn write(&mut self, address: sm83::memory::Address, value: u8) {
+        match address {
+            0x8000..=0x9FFF => self.vram.write(address, value),
+            0xFF40..=0xFF4B => self.regs.write(address, value),
+            _ => {
+                panic!("Unmapped address in PPU: {address}")
+            }
+        }
+    }
 }
