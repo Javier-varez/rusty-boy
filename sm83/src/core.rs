@@ -56,18 +56,18 @@ impl Flags {
 }
 
 #[derive(Debug, Clone)]
-struct Registers {
-    flags: Flags,
-    a_reg: u8,
-    b_reg: u8,
-    c_reg: u8,
-    d_reg: u8,
-    e_reg: u8,
-    h_reg: u8,
-    l_reg: u8,
-    sp_reg: u16,
-    pc_reg: u16,
-    irq_en: bool, // IME register
+pub struct Registers {
+    pub flags: Flags,
+    pub a_reg: u8,
+    pub b_reg: u8,
+    pub c_reg: u8,
+    pub d_reg: u8,
+    pub e_reg: u8,
+    pub h_reg: u8,
+    pub l_reg: u8,
+    pub sp_reg: u16,
+    pub pc_reg: u16,
+    pub irq_en: bool, // IME register
 }
 
 impl Default for Registers {
@@ -473,11 +473,11 @@ impl Cpu {
         }
     }
 
-    const fn get_regs(&self) -> &Registers {
+    pub const fn get_regs(&self) -> &Registers {
         &self.regs
     }
 
-    fn get_mut_regs(&mut self) -> &mut Registers {
+    pub fn get_mut_regs(&mut self) -> &mut Registers {
         &mut self.regs
     }
 
