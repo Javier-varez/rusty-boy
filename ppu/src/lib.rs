@@ -18,8 +18,47 @@ pub enum Color {
     Black = 3,
 }
 
-const DISPLAY_WIDTH: usize = 160;
-const DISPLAY_HEIGHT: usize = 144;
+/// An index into the palette, which resolves to a specific color
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PaletteIndex {
+    Id0 = 0,
+    Id1 = 1,
+    Id2 = 2,
+    Id3 = 3,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Palette(u8);
+
+impl Palette {
+    pub fn color(&self, idx: PaletteIndex) -> Color {
+        let idx = idx as u8 as usize;
+        let color = 3 & (self.0 >> (2 * idx));
+        match color {
+            0 => Color::White,
+            1 => Color::LightGrey,
+            2 => Color::DarkGrey,
+            3 => Color::Black,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<u8> for Palette {
+    fn from(value: u8) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Palette> for u8 {
+    fn from(value: Palette) -> Self {
+        value.0
+    }
+}
+
+pub const DISPLAY_WIDTH: usize = 160;
+pub const DISPLAY_HEIGHT: usize = 144;
 
 pub enum PpuResult<'a> {
     InProgress(Mode),
@@ -45,6 +84,8 @@ const OAM_SCAN_LEN: usize = 80;
 const DRAWING_PIXELS_LEN: usize = 172;
 const HBLANK_LEN: usize = 204;
 const LINE_LENGTH: usize = OAM_SCAN_LEN + DRAWING_PIXELS_LEN + HBLANK_LEN;
+
+static_assertions::const_assert_eq!(CYCLES_PER_FRAME, LINE_LENGTH * 154);
 
 fn current_line(cycles: Cycles) -> usize {
     let cycles: usize = cycles.into();
@@ -80,6 +121,10 @@ impl Ppu {
             cycles: Cycles::new(0),
             framebuffer: [[Color::White; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
         }
+    }
+
+    pub fn mode(&self) -> Mode {
+        self.mode
     }
 
     /// Runs the PPU for the given number of cycles and then returns the PPU state
@@ -124,9 +169,10 @@ impl Ppu {
         PpuResult::InProgress(self.mode)
     }
 
-    fn draw_line(&mut self, line: usize) {
-        let bg_y_offset = self.regs.scy;
-        let bg_x_offset = self.regs.scx;
+    fn draw_line(&mut self, line_idx: usize) {
+        let bg_y_offset = self.regs.scy as usize;
+        // TODO: use bg_x_offset, currently it is completely ignored
+        let bg_x_offset = self.regs.scx as usize;
         let palette = self.regs.bg_palette;
 
         let bg_tile_map: crate::regs::LCDC::BG_TILE_MAP::Value = self
@@ -141,11 +187,30 @@ impl Ppu {
             .read_as_enum(crate::regs::LCDC::BG_AND_WINDOW_TILE_DATA)
             .expect("Invalid LCDC bit 4");
 
-        unimplemented!()
+        let mut x_offset = 0;
+        'outer: for tile_index in self
+            .vram
+            .get_tile_map(bg_tile_map)
+            .line(bg_y_offset + line_idx)
+        {
+            let tile = self.vram.get_tile(*tile_index, bg_tile_data_area);
+            let tile_line_idx = (bg_y_offset + line_idx) % vram::TILE_HEIGHT;
+            let tile_line = tile.get_line(tile_line_idx);
+            for pixel in tile_line.iter() {
+                let bit_color = palette.color(pixel);
+                self.framebuffer[line_idx][x_offset] = bit_color;
+                x_offset += 1;
+                if x_offset >= DISPLAY_WIDTH {
+                    break 'outer;
+                }
+            }
+        }
     }
 
     fn update_registers(&mut self, line: usize) {
-        unimplemented!()
+        // TODO: Implement the rest of register updates
+        self.regs.ly = line as u8;
+        // unimplemented!()
     }
 }
 

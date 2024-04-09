@@ -1,5 +1,6 @@
 //! Implements the memory mapped interface to VRAM, etc
 
+use super::Palette;
 use tock_registers::interfaces::{Readable, Writeable};
 use tock_registers::{register_bitfields, registers::InMemoryRegister};
 
@@ -113,11 +114,11 @@ pub struct Registers {
     // LCD Y compare coordinate => 0xFF45
     pub(crate) lyc: u8,
     // BG palette => 0xFF47
-    pub(crate) bg_palette: u8,
+    pub(crate) bg_palette: Palette,
     // Obj palette 0 => 0xFF48
-    pub(crate) obj_palette0: u8,
+    pub(crate) obj_palette0: Palette,
     // Obj palette 1 => 0xFF49
-    pub(crate) obj_palette1: u8,
+    pub(crate) obj_palette1: Palette,
     // Window Y coordinate => 0xFF4A
     pub(crate) wy: u8,
     // Window X coordinate => 0xFF4B
@@ -133,9 +134,9 @@ impl Registers {
             scx: 0,
             ly: 0,
             lyc: 0,
-            bg_palette: 0,
-            obj_palette0: 0,
-            obj_palette1: 0,
+            bg_palette: Palette(0),
+            obj_palette0: Palette(0),
+            obj_palette1: Palette(0),
             wy: 0,
             wx: 0,
         }
@@ -151,9 +152,9 @@ impl sm83::memory::Memory for Registers {
             0xFF43 => self.scx,
             0xFF44 => self.ly,
             0xFF45 => self.lyc,
-            0xFF47 => self.bg_palette,
-            0xFF48 => self.obj_palette0,
-            0xFF49 => self.obj_palette1,
+            0xFF47 => self.bg_palette.into(),
+            0xFF48 => self.obj_palette0.into(),
+            0xFF49 => self.obj_palette1.into(),
             0xFF4A => self.wy,
             0xFF4B => self.wx,
             _ => {
@@ -170,9 +171,9 @@ impl sm83::memory::Memory for Registers {
             0xFF43 => self.scx = value,
             0xFF44 => self.ly = value,
             0xFF45 => self.lyc = value,
-            0xFF47 => self.bg_palette = value,
-            0xFF48 => self.obj_palette0 = value,
-            0xFF49 => self.obj_palette1 = value,
+            0xFF47 => self.bg_palette = value.into(),
+            0xFF48 => self.obj_palette0 = value.into(),
+            0xFF49 => self.obj_palette1 = value.into(),
             0xFF4A => self.wy = value,
             0xFF4B => self.wx = value,
             _ => {
