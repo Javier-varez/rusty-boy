@@ -3,7 +3,7 @@ use crate::{
         self, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairMem, RegisterPairStack,
         ResetTarget,
     },
-    memory::Memory,
+    memory::{self, Memory},
 };
 
 #[repr(u8)]
@@ -460,23 +460,15 @@ pub enum ExitReason {
     IllegalOpcode,
 }
 
-pub struct Cpu<T>
-where
-    T: Memory,
-{
+pub struct Cpu {
     regs: Registers,
-    memory: T,
     halted: bool,
 }
 
-impl<T> Cpu<T>
-where
-    T: Memory,
-{
-    pub fn new(memory: T) -> Self {
+impl Cpu {
+    pub fn new() -> Self {
         Self {
             regs: Registers::new(),
-            memory,
             halted: false,
         }
     }
@@ -612,16 +604,16 @@ where
         pc
     }
 
-    fn read_8_bit_immediate(&mut self) -> u8 {
+    fn read_8_bit_immediate<T: Memory>(&mut self, memory: &mut T) -> u8 {
         let pc = self.step_pc();
-        self.memory.read(pc)
+        memory.read(pc)
     }
 
-    fn read_16_bit_immediate(&mut self) -> u16 {
+    fn read_16_bit_immediate<T: Memory>(&mut self, memory: &mut T) -> u16 {
         let pc = self.step_pc();
-        let lo = self.memory.read(pc);
+        let lo = memory.read(pc);
         let pc = self.step_pc();
-        let hi = self.memory.read(pc);
+        let hi = memory.read(pc);
         ((hi as u16) << 8) | (lo as u16)
     }
 
@@ -634,41 +626,41 @@ where
         }
     }
 
-    fn stack_push(&mut self, value: u16) {
+    fn stack_push<T: Memory>(&mut self, memory: &mut T, value: u16) {
         let sp = self.get_reg_pair(RegisterPair::SP);
         let pos = sp.wrapping_sub(1);
-        self.memory.write(pos, (value >> 8) as u8);
+        memory.write(pos, (value >> 8) as u8);
         let pos = pos.wrapping_sub(1);
-        self.memory.write(pos, (value & 0xff) as u8);
+        memory.write(pos, (value & 0xff) as u8);
         self.set_reg_pair(RegisterPair::SP, pos);
     }
 
-    fn stack_pop(&mut self) -> u16 {
+    fn stack_pop<T: Memory>(&mut self, memory: &mut T) -> u16 {
         let sp = self.get_reg_pair(RegisterPair::SP);
         let pos = sp;
-        let lo = self.memory.read(pos);
+        let lo = memory.read(pos);
         let pos = pos.wrapping_add(1);
-        let hi = self.memory.read(pos);
+        let hi = memory.read(pos);
         let pos = pos.wrapping_add(1);
         self.set_reg_pair(RegisterPair::SP, pos);
         (lo as u16) | ((hi as u16) << 8)
     }
 
-    fn fetch_and_decode(&mut self) -> OpCode {
+    fn fetch_and_decode<T: Memory>(&mut self, memory: &mut T) -> OpCode {
         let pc = self.step_pc();
-        let insn = self.memory.read(pc);
+        let insn = memory.read(pc);
 
         match decoder::decode(insn) {
             OpCode::Prefix => {
                 let pc = self.step_pc();
-                let insn = self.memory.read(pc);
+                let insn = memory.read(pc);
                 decoder::decode_prefixed(insn)
             }
             opcode => opcode,
         }
     }
 
-    pub fn step(&mut self, interrupts: Interrupts) -> ExitReason {
+    pub fn step<T: Memory>(&mut self, memory: &mut T, interrupts: Interrupts) -> ExitReason {
         if self.halted && !interrupts.has_any() {
             return ExitReason::Halt(Cycles::new(4));
         }
@@ -681,16 +673,16 @@ where
         {
             self.regs.irq_en = false;
             let return_addr = self.get_regs().pc_reg;
-            self.stack_push(return_addr);
+            self.stack_push(memory, return_addr);
             self.get_mut_regs().pc_reg = translate_irq_target(irq);
             ExitReason::InterruptTaken(irq)
         } else {
-            let instruction = self.fetch_and_decode();
-            self.execute(instruction)
+            let instruction = self.fetch_and_decode(memory);
+            self.execute(memory, instruction)
         }
     }
 
-    fn execute(&mut self, opcode: OpCode) -> ExitReason {
+    fn execute<T: Memory>(&mut self, memory: &mut T, opcode: OpCode) -> ExitReason {
         let cycles = match opcode {
             OpCode::Prefix => {
                 panic!("Attempted to execute prefix opcode!");
@@ -713,94 +705,94 @@ where
                 Cycles::new(4)
             }
             OpCode::Ld8RegImm(dest) => {
-                let value = self.read_8_bit_immediate();
+                let value = self.read_8_bit_immediate(memory);
                 self.set_reg(dest, value);
                 Cycles::new(8)
             }
             OpCode::Ld8RegInd(dest, src) => {
                 let addr = self.get_reg_pair(src);
-                let value = self.memory.read(addr);
+                let value = memory.read(addr);
                 self.set_reg(dest, value);
                 Cycles::new(8)
             }
             OpCode::Ld8IndReg(dest, src) => {
                 let value = self.get_reg(src);
                 let addr = self.get_reg_pair(dest);
-                self.memory.write(addr, value);
+                memory.write(addr, value);
                 Cycles::new(8)
             }
             OpCode::Ld8IndImm(dest) => {
-                let value = self.read_8_bit_immediate();
+                let value = self.read_8_bit_immediate(memory);
                 let addr = self.get_reg_pair(dest);
-                self.memory.write(addr, value);
+                memory.write(addr, value);
                 Cycles::new(12)
             }
             OpCode::Ld8IndAcc(dest) => {
                 let value = self.get_reg(Register::A);
                 let addr = self.get_reg_pair_mem(dest);
-                self.memory.write(addr, value);
+                memory.write(addr, value);
                 Cycles::new(8)
             }
             OpCode::Ld8AccInd(dest) => {
                 let addr = self.get_reg_pair_mem(dest);
-                let value = self.memory.read(addr);
+                let value = memory.read(addr);
                 self.set_reg(Register::A, value);
                 Cycles::new(8)
             }
             OpCode::Ld8ZeroPageCAcc => {
                 let regs = self.get_regs();
                 let addr = 0xFF00 | regs.c_reg as u16;
-                self.memory.write(addr, regs.a_reg);
+                memory.write(addr, regs.a_reg);
                 Cycles::new(8)
             }
             OpCode::Ld8AccZeroPageC => {
                 let regs = self.get_regs();
                 let addr = 0xFF00 | regs.c_reg as u16;
-                let value = self.memory.read(addr);
+                let value = memory.read(addr);
                 self.get_mut_regs().a_reg = value;
                 Cycles::new(8)
             }
             OpCode::Ld8ZeroPageImmAcc => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let addr = 0xFF00 | imm as u16;
-                self.memory.write(addr, self.get_regs().a_reg);
+                memory.write(addr, self.get_regs().a_reg);
                 Cycles::new(12)
             }
             OpCode::Ld8AccZeroPageImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let addr = 0xFF00 | imm as u16;
-                let value = self.memory.read(addr);
+                let value = memory.read(addr);
                 self.get_mut_regs().a_reg = value;
                 Cycles::new(12)
             }
             OpCode::Ld8IndImmAcc => {
-                let imm = self.read_16_bit_immediate();
+                let imm = self.read_16_bit_immediate(memory);
                 let addr = 0xFF00 | imm;
-                self.memory.write(addr, self.get_regs().a_reg);
+                memory.write(addr, self.get_regs().a_reg);
                 Cycles::new(16)
             }
             OpCode::Ld8AccIndImm => {
-                let imm = self.read_16_bit_immediate();
+                let imm = self.read_16_bit_immediate(memory);
                 let addr = 0xFF00 | imm;
-                let value = self.memory.read(addr);
+                let value = memory.read(addr);
                 self.get_mut_regs().a_reg = value;
                 Cycles::new(16)
             }
             OpCode::Ld16RegImm(dest) => {
-                let imm = self.read_16_bit_immediate();
+                let imm = self.read_16_bit_immediate(memory);
                 self.set_reg_pair(dest, imm);
                 Cycles::new(12)
             }
             OpCode::Ld16IndImmSp => {
-                let imm = self.read_16_bit_immediate();
+                let imm = self.read_16_bit_immediate(memory);
                 let sp = self.get_reg_pair(RegisterPair::SP);
-                self.memory.write(imm, (sp & 0xff) as u8);
-                self.memory.write(imm.wrapping_add(1), (sp >> 8) as u8);
+                memory.write(imm, (sp & 0xff) as u8);
+                memory.write(imm.wrapping_add(1), (sp >> 8) as u8);
                 Cycles::new(20)
             }
             OpCode::Ld16HlSpImm => {
                 let sp = self.get_regs().sp_reg;
-                let imm = self.read_8_bit_immediate() as i8 as i16;
+                let imm = self.read_8_bit_immediate(memory) as i8 as i16;
                 let value = ((sp as i16).wrapping_add(imm)) as u16;
                 self.set_reg_pair(RegisterPair::HL, value);
 
@@ -890,7 +882,7 @@ where
                 Cycles::new(8)
             }
             OpCode::AddAccImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = add(a, imm, false);
                 self.set_reg(Register::A, result);
@@ -898,7 +890,7 @@ where
                 Cycles::new(8)
             }
             OpCode::AdcAccImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = add(a, imm, self.get_flag(Flag::C));
                 self.set_reg(Register::A, result);
@@ -906,7 +898,7 @@ where
                 Cycles::new(8)
             }
             OpCode::SubAccImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = sub(a, imm, false);
                 self.set_reg(Register::A, result);
@@ -914,7 +906,7 @@ where
                 Cycles::new(8)
             }
             OpCode::SbcAccImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = sub(a, imm, self.get_flag(Flag::C));
                 self.set_reg(Register::A, result);
@@ -922,7 +914,7 @@ where
                 Cycles::new(8)
             }
             OpCode::AndAccImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = and(a, imm);
                 self.set_reg(Register::A, result);
@@ -930,7 +922,7 @@ where
                 Cycles::new(8)
             }
             OpCode::OrAccImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = or(a, imm);
                 self.set_reg(Register::A, result);
@@ -938,7 +930,7 @@ where
                 Cycles::new(8)
             }
             OpCode::XorAccImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = xor(a, imm);
                 self.set_reg(Register::A, result);
@@ -946,7 +938,7 @@ where
                 Cycles::new(8)
             }
             OpCode::CpAccImm => {
-                let imm = self.read_8_bit_immediate();
+                let imm = self.read_8_bit_immediate(memory);
                 let a = self.get_reg(Register::A);
                 let (_, flags) = sub(a, imm, false);
                 self.set_flags(flags);
@@ -954,7 +946,7 @@ where
             }
             OpCode::AddSpImm => {
                 // This is somewhat special as it is signed 16-bit addition
-                let imm = sign_extend(self.read_8_bit_immediate());
+                let imm = sign_extend(self.read_8_bit_immediate(memory));
                 let sp = self.get_reg_pair(RegisterPair::SP);
                 let result = sp.wrapping_add(imm);
                 self.set_reg_pair(RegisterPair::SP, result);
@@ -967,7 +959,7 @@ where
             }
             OpCode::AddAccHlInd => {
                 let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = self.memory.read(hl);
+                let mem = memory.read(hl);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = add(a, mem, false);
                 self.set_reg(Register::A, result);
@@ -976,7 +968,7 @@ where
             }
             OpCode::AdcAccHlInd => {
                 let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = self.memory.read(hl);
+                let mem = memory.read(hl);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = add(a, mem, self.get_flag(Flag::C));
                 self.set_reg(Register::A, result);
@@ -985,7 +977,7 @@ where
             }
             OpCode::SubAccHlInd => {
                 let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = self.memory.read(hl);
+                let mem = memory.read(hl);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = sub(a, mem, false);
                 self.set_reg(Register::A, result);
@@ -994,7 +986,7 @@ where
             }
             OpCode::SbcAccHlInd => {
                 let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = self.memory.read(hl);
+                let mem = memory.read(hl);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = sub(a, mem, self.get_flag(Flag::C));
                 self.set_reg(Register::A, result);
@@ -1003,7 +995,7 @@ where
             }
             OpCode::AndAccHlInd => {
                 let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = self.memory.read(hl);
+                let mem = memory.read(hl);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = and(a, mem);
                 self.set_reg(Register::A, result);
@@ -1012,7 +1004,7 @@ where
             }
             OpCode::XorAccHlInd => {
                 let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = self.memory.read(hl);
+                let mem = memory.read(hl);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = xor(a, mem);
                 self.set_reg(Register::A, result);
@@ -1021,7 +1013,7 @@ where
             }
             OpCode::OrAccHlInd => {
                 let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = self.memory.read(hl);
+                let mem = memory.read(hl);
                 let a = self.get_reg(Register::A);
                 let (result, flags) = or(a, mem);
                 self.set_reg(Register::A, result);
@@ -1030,7 +1022,7 @@ where
             }
             OpCode::CpAccHlInd => {
                 let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = self.memory.read(hl);
+                let mem = memory.read(hl);
                 let a = self.get_reg(Register::A);
                 let (_, flags) = sub(a, mem, false);
                 self.set_flags(flags);
@@ -1075,9 +1067,9 @@ where
             }
             OpCode::IncIndHl => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let val = self.memory.read(addr);
+                let val = memory.read(addr);
                 let val = val.wrapping_add(1);
-                self.memory.write(addr, val);
+                memory.write(addr, val);
                 self.set_flags(
                     self.get_flags()
                         .with(Flag::Z, val == 0)
@@ -1089,9 +1081,9 @@ where
             OpCode::DecIndHl => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
                 let minus_one = 0xff;
-                let prev = self.memory.read(addr);
+                let prev = memory.read(addr);
                 let next = prev.wrapping_add(minus_one);
-                self.memory.write(addr, next);
+                memory.write(addr, next);
                 self.set_flags(
                     self.get_flags()
                         .with(Flag::Z, next == 0)
@@ -1125,14 +1117,14 @@ where
                 Cycles::new(4)
             }
             OpCode::JrImm => {
-                let target_offset = self.read_16_bit_immediate() as i16;
+                let target_offset = self.read_16_bit_immediate(memory) as i16;
                 let pc = self.get_regs().pc_reg;
                 let target = (pc as i16).wrapping_add(target_offset) as u16;
                 self.get_mut_regs().pc_reg = target;
                 Cycles::new(12)
             }
             OpCode::JrCondImm(condition) => {
-                let target_offset = self.read_16_bit_immediate() as i16;
+                let target_offset = self.read_16_bit_immediate(memory) as i16;
                 if self.check_condition(condition) {
                     let pc = self.get_regs().pc_reg;
                     let target = (pc as i16).wrapping_add(target_offset) as u16;
@@ -1144,7 +1136,7 @@ where
             }
             OpCode::RetCond(condition) => {
                 if self.check_condition(condition) {
-                    let value = self.stack_pop();
+                    let value = self.stack_pop(memory);
                     self.get_mut_regs().pc_reg = value;
                     Cycles::new(20)
                 } else {
@@ -1152,19 +1144,19 @@ where
                 }
             }
             OpCode::Ret => {
-                let value = self.stack_pop();
+                let value = self.stack_pop(memory);
                 self.get_mut_regs().pc_reg = value;
                 Cycles::new(16)
             }
             OpCode::Reti => {
-                let value = self.stack_pop();
+                let value = self.stack_pop(memory);
                 let regs = self.get_mut_regs();
                 regs.pc_reg = value;
                 regs.irq_en = true;
                 Cycles::new(16)
             }
             OpCode::JpCondImm(condition) => {
-                let target = self.read_16_bit_immediate();
+                let target = self.read_16_bit_immediate(memory);
                 if self.check_condition(condition) {
                     self.get_mut_regs().pc_reg = target;
                     Cycles::new(16)
@@ -1173,7 +1165,7 @@ where
                 }
             }
             OpCode::JpImm => {
-                let target = self.read_16_bit_immediate();
+                let target = self.read_16_bit_immediate(memory);
                 self.get_mut_regs().pc_reg = target;
                 Cycles::new(16)
             }
@@ -1183,10 +1175,10 @@ where
                 Cycles::new(4)
             }
             OpCode::CallCondImm(condition) => {
-                let target = self.read_16_bit_immediate();
+                let target = self.read_16_bit_immediate(memory);
                 if self.check_condition(condition) {
                     let return_addr = self.get_regs().pc_reg;
-                    self.stack_push(return_addr);
+                    self.stack_push(memory, return_addr);
                     self.get_mut_regs().pc_reg = target;
                     Cycles::new(24)
                 } else {
@@ -1194,27 +1186,27 @@ where
                 }
             }
             OpCode::CallImm => {
-                let target = self.read_16_bit_immediate();
+                let target = self.read_16_bit_immediate(memory);
                 let return_addr = self.get_regs().pc_reg;
-                self.stack_push(return_addr);
+                self.stack_push(memory, return_addr);
                 self.get_mut_regs().pc_reg = target;
                 Cycles::new(24)
             }
             OpCode::Reset(target) => {
                 let target = translate_reset_target(target);
                 let return_addr = self.get_regs().pc_reg;
-                self.stack_push(return_addr);
+                self.stack_push(memory, return_addr);
                 self.get_mut_regs().pc_reg = target;
                 Cycles::new(16)
             }
             OpCode::Pop(reg) => {
-                let value = self.stack_pop();
+                let value = self.stack_pop(memory);
                 self.set_reg_pair_stack(reg, value);
                 Cycles::new(12)
             }
             OpCode::Push(reg) => {
                 let value = self.get_reg_pair_stack(reg);
-                self.stack_push(value);
+                self.stack_push(memory, value);
                 Cycles::new(16)
             }
             OpCode::Di => {
@@ -1291,76 +1283,76 @@ where
             }
             OpCode::RlcHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rlc(self.memory.read(addr));
-                self.memory.write(addr, shifted);
+                let (shifted, flags) = rlc(memory.read(addr));
+                memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::RrcHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rrc(self.memory.read(addr));
-                self.memory.write(addr, shifted);
+                let (shifted, flags) = rrc(memory.read(addr));
+                memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::RlHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rl(self.memory.read(addr), self.get_flag(Flag::C));
-                self.memory.write(addr, shifted);
+                let (shifted, flags) = rl(memory.read(addr), self.get_flag(Flag::C));
+                memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::RrHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rr(self.memory.read(addr), self.get_flag(Flag::C));
-                self.memory.write(addr, shifted);
+                let (shifted, flags) = rr(memory.read(addr), self.get_flag(Flag::C));
+                memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::SlaHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = sla(self.memory.read(addr));
-                self.memory.write(addr, shifted);
+                let (shifted, flags) = sla(memory.read(addr));
+                memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::SraHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = sra(self.memory.read(addr));
-                self.memory.write(addr, shifted);
+                let (shifted, flags) = sra(memory.read(addr));
+                memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::SwapHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = swap(self.memory.read(addr));
-                self.memory.write(addr, shifted);
+                let (shifted, flags) = swap(memory.read(addr));
+                memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::SrlHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = srl(self.memory.read(addr));
-                self.memory.write(addr, shifted);
+                let (shifted, flags) = srl(memory.read(addr));
+                memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::BitHlInd(bit_idx) => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let flags = bit(bit_idx, self.memory.read(addr), self.get_flags());
+                let flags = bit(bit_idx, memory.read(addr), self.get_flags());
                 self.set_flags(flags);
                 Cycles::new(12)
             }
             OpCode::ResHlInd(bit_idx) => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let value = res(bit_idx, self.memory.read(addr));
-                self.memory.write(addr, value);
+                let value = res(bit_idx, memory.read(addr));
+                memory.write(addr, value);
                 Cycles::new(16)
             }
             OpCode::SetHlInd(bit_idx) => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let value = set(bit_idx, self.memory.read(addr));
-                self.memory.write(addr, value);
+                let value = set(bit_idx, memory.read(addr));
+                memory.write(addr, value);
                 Cycles::new(16)
             }
         };
