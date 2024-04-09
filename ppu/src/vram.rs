@@ -1,4 +1,4 @@
-//! Implements the memory mapped interface to registers, VRAM, etc
+//! Implements the memory mapped interface to VRAM
 
 /// The width of the tile
 const TILE_WIDTH: usize = 8;
@@ -23,7 +23,7 @@ const NUM_TILE_MAPS: usize = 2;
 /// Represents a single line of a tile. Each byte in the u16 indicates
 #[repr(C)]
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
-struct TileLine([u8; TILE_LINE_SIZE]);
+pub(crate) struct TileLine(pub(crate) [u8; TILE_LINE_SIZE]);
 
 impl TileLine {
     const fn new() -> Self {
@@ -46,7 +46,7 @@ impl sm83::memory::Memory for TileLine {
 
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Debug)]
-struct Tile([TileLine; TILE_HEIGHT]);
+pub(crate) struct Tile(pub(crate) [TileLine; TILE_HEIGHT]);
 
 // A tile must occupy 16 bytes
 static_assertions::assert_eq_size!([u8; 16], Tile);
@@ -79,7 +79,7 @@ impl sm83::memory::Memory for Tile {
 
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Debug)]
-struct TileBlock([Tile; TILES_PER_BLOCK]);
+pub(crate) struct TileBlock(pub(crate) [Tile; TILES_PER_BLOCK]);
 
 // A tile block must occupy 2048 bytes
 static_assertions::assert_eq_size!([u8; 2048], TileBlock);
@@ -113,7 +113,7 @@ impl sm83::memory::Memory for TileBlock {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TileIndex(u8);
+pub(crate) struct TileIndex(u8);
 
 impl TileIndex {
     pub const fn new(index: u8) -> Self {
@@ -138,7 +138,7 @@ const TILE_MAP_HEIGHT: usize = 32;
 
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TileMap([[TileIndex; TILE_MAP_WIDTH]; TILE_MAP_HEIGHT]);
+pub(crate) struct TileMap(pub(crate) [[TileIndex; TILE_MAP_WIDTH]; TILE_MAP_HEIGHT]);
 
 impl TileMap {
     const fn new() -> Self {
@@ -149,14 +149,15 @@ impl TileMap {
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Vram {
-    tile_blocks: [TileBlock; NUM_TILE_BLOCKS],
-    tile_maps: [TileMap; NUM_TILE_MAPS],
+    pub(crate) tile_blocks: [TileBlock; NUM_TILE_BLOCKS],
+    pub(crate) tile_maps: [TileMap; NUM_TILE_MAPS],
 }
 
 // The VRAM occupies 0x2000 bytes.
 static_assertions::assert_eq_size!([u8; 0x2000], Vram);
 
 impl Vram {
+    const VRAM_BASE: u16 = 0x8000;
     pub const fn new() -> Self {
         const TILE_BLOCK: TileBlock = TileBlock::new();
         const TILE_MAP: TileMap = TileMap::new();
@@ -169,6 +170,7 @@ impl Vram {
     const fn vram_address_to_block_address(
         address: sm83::memory::Address,
     ) -> (usize, sm83::memory::Address) {
+        let address = address - Self::VRAM_BASE;
         let blk_idx = address as usize / core::mem::size_of::<TileBlock>();
         let blk_address = address % core::mem::size_of::<TileBlock>() as u16;
         (blk_idx, blk_address)

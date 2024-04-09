@@ -1,3 +1,5 @@
+//! Implements the memory mapped interface to OAM
+
 use static_assertions::assert_eq_size;
 
 use crate::vram::TileIndex;
@@ -110,26 +112,12 @@ impl Oam {
 
 impl sm83::memory::Memory for Oam {
     fn read(&mut self, address: sm83::memory::Address) -> u8 {
-        match address {
-            0xFE00..=0xFE0F => {
-                let (object_idx, object_member_offset) = Self::cpu_addr_to_object_addr(address);
-                self.objects[object_idx].read(object_member_offset)
-            }
-            _ => {
-                panic!("Unmapped address in OAM: {address}");
-            }
-        }
+        let (object_idx, object_member_offset) = Self::cpu_addr_to_object_addr(address);
+        self.objects[object_idx].read(object_member_offset)
     }
 
     fn write(&mut self, address: sm83::memory::Address, value: u8) {
-        match address {
-            0xFE00..=0xFE0F => {
-                let (object_idx, object_member_offset) = Self::cpu_addr_to_object_addr(address);
-                self.objects[object_idx].write(object_member_offset, value);
-            }
-            _ => {
-                panic!("Unmapped address in OAM: {address}");
-            }
-        };
+        let (object_idx, object_member_offset) = Self::cpu_addr_to_object_addr(address);
+        self.objects[object_idx].write(object_member_offset, value);
     }
 }

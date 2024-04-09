@@ -1,3 +1,5 @@
+//! Implements the memory mapped interface to VRAM, etc
+
 use tock_registers::interfaces::{Readable, Writeable};
 use tock_registers::{register_bitfields, registers::InMemoryRegister};
 
@@ -6,7 +8,7 @@ register_bitfields! [
 
     /// LCDC is the main LCD Control register. Its bits toggle what elements are displayed on
     /// the screen, and how.
-    LCDC [
+    pub LCDC [
         /// This bit controls whether the LCD is on and the PPU is active. Setting it to 0 turns both
         /// off, which grants immediate and full access to VRAM, OAM, etc.
         ENABLE OFFSET(7) NUMBITS(1) [
@@ -99,27 +101,27 @@ register_bitfields! [
 
 pub struct Registers {
     // LCDC => 0xFF40
-    lcdc: InMemoryRegister<u8, LCDC::Register>,
+    pub(crate) lcdc: InMemoryRegister<u8, LCDC::Register>,
     // LCD Status => 0xFF41
-    status: InMemoryRegister<u8, STAT::Register>,
+    pub(crate) status: InMemoryRegister<u8, STAT::Register>,
     // Background viewport Y coordinate => 0xFF42
-    scy: u8,
+    pub(crate) scy: u8,
     // Background viewport X coordinate => 0xFF43
-    scx: u8,
+    pub(crate) scx: u8,
     // LCD Y coordinate => 0xFF44
-    ly: u8,
+    pub(crate) ly: u8,
     // LCD Y compare coordinate => 0xFF45
-    lyc: u8,
+    pub(crate) lyc: u8,
     // BG palette => 0xFF47
-    bg_palette: u8,
+    pub(crate) bg_palette: u8,
     // Obj palette 0 => 0xFF48
-    obj_palette0: u8,
+    pub(crate) obj_palette0: u8,
     // Obj palette 1 => 0xFF49
-    obj_palette1: u8,
+    pub(crate) obj_palette1: u8,
     // Window Y coordinate => 0xFF4A
-    wy: u8,
+    pub(crate) wy: u8,
     // Window X coordinate => 0xFF4B
-    wx: u8,
+    pub(crate) wx: u8,
 }
 
 impl Registers {
