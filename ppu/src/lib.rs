@@ -10,6 +10,8 @@ use sm83::core::Cycles;
 use tock_registers::interfaces::Readable;
 use vram::Vram;
 
+use self::vram::TILE_WIDTH;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Color {
     White = 0,
@@ -65,6 +67,8 @@ pub enum PpuResult<'a> {
     FrameComplete(&'a [[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]),
 }
 
+pub type Frame = [[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT];
+
 /// The Picture Processing Unit
 pub struct Ppu {
     vram: Vram,
@@ -75,7 +79,7 @@ pub struct Ppu {
     cycles: Cycles,
 
     /// Origin of coordinates is top-left pixel.
-    framebuffer: [[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
+    framebuffer: Frame,
 }
 
 const CYCLES_PER_FRAME: usize = 70224;
@@ -137,6 +141,10 @@ impl Ppu {
         self.step(new_mode, line)
     }
 
+    pub fn frame(&self) -> &Frame {
+        &self.framebuffer
+    }
+
     fn step(&mut self, new_mode: Mode, line: usize) -> PpuResult {
         if self.mode == new_mode {
             self.update_registers(line);
@@ -171,7 +179,6 @@ impl Ppu {
 
     fn draw_line(&mut self, line_idx: usize) {
         let bg_y_offset = self.regs.scy as usize;
-        // TODO: use bg_x_offset, currently it is completely ignored
         let bg_x_offset = self.regs.scx as usize;
         let palette = self.regs.bg_palette;
 
@@ -187,23 +194,31 @@ impl Ppu {
             .read_as_enum(crate::regs::LCDC::BG_AND_WINDOW_TILE_DATA)
             .expect("Invalid LCDC bit 4");
 
-        let mut x_offset = 0;
+        let mut x_inner_offset = bg_x_offset % TILE_WIDTH;
+        let x_tile_offset = bg_x_offset / TILE_WIDTH;
+
+        let mut disp_x_offset = 0;
+
         'outer: for tile_index in self
             .vram
             .get_tile_map(bg_tile_map)
             .line(bg_y_offset + line_idx)
+            .iter()
+            .cycle()
+            .skip(x_tile_offset)
         {
             let tile = self.vram.get_tile(*tile_index, bg_tile_data_area);
             let tile_line_idx = (bg_y_offset + line_idx) % vram::TILE_HEIGHT;
             let tile_line = tile.get_line(tile_line_idx);
-            for pixel in tile_line.iter() {
+            for pixel in tile_line.iter().skip(x_inner_offset) {
                 let bit_color = palette.color(pixel);
-                self.framebuffer[line_idx][x_offset] = bit_color;
-                x_offset += 1;
-                if x_offset >= DISPLAY_WIDTH {
+                self.framebuffer[line_idx][disp_x_offset] = bit_color;
+                disp_x_offset += 1;
+                if disp_x_offset >= DISPLAY_WIDTH {
                     break 'outer;
                 }
             }
+            x_inner_offset = 0;
         }
     }
 
