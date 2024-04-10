@@ -57,9 +57,25 @@ CopyTilemap:
   ld a, %11100100
   ld [rBGP], a
 
-Done:
-  jp Done
+  ; Scroll
+Scroll:
+WaitVBlankBeforeScrolling:
+  ld a, [rLY]
+  cp 144
+  jp c, WaitVBlankBeforeScrolling
 
+  ; Increment SCX
+  ld a, [rSCX]
+  add a, $1
+  ld [rSCX], a
+
+WaitVBlankEnd:
+  ld a, [rLY]
+  cp 144
+  jp nc, WaitVBlankEnd
+
+  ; And keep scrolling
+  jp Scroll
 
 SECTION "Tile data", ROM0
 
