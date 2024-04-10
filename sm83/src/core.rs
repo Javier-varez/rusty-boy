@@ -3,7 +3,7 @@ use crate::{
         self, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairMem, RegisterPairStack,
         ResetTarget,
     },
-    memory::{self, Memory},
+    memory::Memory,
 };
 
 #[repr(u8)]

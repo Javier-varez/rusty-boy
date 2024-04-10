@@ -1,41 +1,16 @@
 mod file_rom;
+mod memory;
+mod rusty_boy;
 
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use ppu::{Color, Ppu, PpuResult, DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use sm83::core::{Cpu, Interrupts};
+use ppu::{Color, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
-use file_rom::FileRom;
+use rusty_boy::RustyBoy;
 
-struct GbAddressSpace<'a> {
-    rom: &'a mut FileRom,
-    ppu: &'a mut Ppu,
-}
-
-impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
-        match address {
-            0x0000..=0x7FFF => self.rom.read(address),
-            0x8000..=0x9FFF | 0xFE00..=0xFE9F | 0xFF40..=0xFF4B => self.ppu.read(address),
-            _ => panic!("Invalid read address: {}", address),
-        }
-    }
-
-    fn write(&mut self, address: sm83::memory::Address, value: u8) {
-        match address {
-            0x0000..=0x7fff => self.rom.write(address, value),
-            0x8000..=0x9FFF | 0xFE00..=0xFE9F | 0xFF40..=0xFF4B => self.ppu.write(address, value),
-            _ => panic!("Invalid write address: {}, value {}", address, value),
-        }
-    }
-}
-
-fn handle_frame(
-    idx: usize,
-    frame: &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
-) -> anyhow::Result<()> {
+fn _save_png(idx: usize, frame: &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]) -> anyhow::Result<()> {
     let path = PathBuf::from_str(&format!("frame_{idx}.png"))?;
 
     const MAX: u8 = 255;
@@ -66,41 +41,54 @@ fn handle_frame(
 
 fn main() -> anyhow::Result<()> {
     let path = PathBuf::from_str("main.gb")?;
-    let mut rom = FileRom::from_file(&path)?;
-    let rom = &mut rom;
+    let mut rusty_boy = RustyBoy::new_with_rom(&path)?;
 
-    let mut cpu = Cpu::new();
-    let mut ppu = Ppu::new();
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsys = sdl_context.video().unwrap();
 
-    cpu.get_mut_regs().pc_reg = 0x100;
-    dbg!(cpu.get_regs());
+    let window = video_subsys
+        .window("rusty-boy", DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32)
+        .position_centered()
+        .build()?;
 
-    const NUM_FRAMES: usize = 10;
-    let mut frame_idx = 0;
+    let mut canvas = window.into_canvas().build()?;
+    canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0xff, 0));
+    canvas.clear();
+    canvas.present();
 
-    loop {
-        let ppu = &mut ppu;
-        let mut memory = GbAddressSpace { rom, ppu };
-
-        let result = cpu.step(&mut memory, Interrupts::new());
-        match result {
-            sm83::core::ExitReason::Step(cycles) => {
-                if let PpuResult::FrameComplete(frame) = ppu.run(cycles) {
-                    handle_frame(frame_idx, frame)?;
-                    frame_idx += 1;
-                }
-            }
-            _ => {
-                panic!("Unexpected PPU exit reason")
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    'running: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                sdl2::event::Event::Quit { .. }
+                | sdl2::event::Event::KeyDown {
+                    keycode: Some(sdl2::keyboard::Keycode::Escape),
+                    ..
+                } => break 'running,
+                _ => {}
             }
         }
 
-        if frame_idx > NUM_FRAMES {
-            break;
+        let frame = rusty_boy.run_until_next_frame().unwrap();
+        for (y, line) in frame.iter().enumerate() {
+            for (x, p) in line.iter().enumerate() {
+                const MAX: u8 = 255;
+                let color = match p {
+                    Color::White => MAX,
+                    Color::LightGrey => MAX / 3 * 2,
+                    Color::DarkGrey => MAX / 3,
+                    Color::Black => 0,
+                };
+                canvas.set_draw_color(sdl2::pixels::Color::RGB(color, color, color));
+                canvas
+                    .draw_point(sdl2::rect::Point::new(x as i32, y as i32))
+                    .unwrap();
+            }
         }
+
+        canvas.present();
+        std::thread::sleep(std::time::Duration::new(0, 1_000_000_000u32 / 60));
     }
-
-    dbg!(cpu.get_regs());
 
     Ok(())
 }
