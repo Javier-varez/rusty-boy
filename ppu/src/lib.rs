@@ -7,7 +7,7 @@ use modes::Mode;
 use oam::Oam;
 use regs::Registers;
 use sm83::core::Cycles;
-use tock_registers::interfaces::Readable;
+use tock_registers::interfaces::{ReadWriteable, Readable};
 use vram::Vram;
 
 use self::vram::TILE_WIDTH;
@@ -173,11 +173,14 @@ impl Ppu {
         }
 
         self.update_registers(line);
-
         PpuResult::InProgress(self.mode)
     }
 
     fn draw_line(&mut self, line_idx: usize) {
+        if self.regs.lcdc.read(regs::LCDC::ENABLE) == 0 {
+            return;
+        }
+
         let bg_y_offset = self.regs.scy as usize;
         let bg_x_offset = self.regs.scx as usize;
         let palette = self.regs.bg_palette;
@@ -223,9 +226,12 @@ impl Ppu {
     }
 
     fn update_registers(&mut self, line: usize) {
-        // TODO: Implement the rest of register updates
-        self.regs.ly = line as u8;
-        // unimplemented!()
+        let line = line as u8;
+        self.regs.ly = line;
+        self.regs.status.modify(
+            regs::STAT::PPU_MODE.val(self.mode as u8)
+                + regs::STAT::LYC_EQ_LY.val((line == self.regs.lyc) as u8),
+        );
     }
 }
 

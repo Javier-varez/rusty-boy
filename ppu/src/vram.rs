@@ -194,7 +194,7 @@ impl TileMap {
     }
 
     pub fn line(&self, line: usize) -> &[TileIndex; TILE_MAP_WIDTH] {
-        let line = (line / TILE_HEIGHT) & (TILE_MAP_HEIGHT - 1);
+        let line = (line / TILE_HEIGHT) % TILE_MAP_HEIGHT;
         &self.0[line]
     }
 }

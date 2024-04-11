@@ -67,7 +67,7 @@ register_bitfields! [
 
 
     /// LCD Status
-    STAT [
+    pub STAT [
         /// Selects the value of the LYC register that triggers the LCD interrupt
         LYC_INT_SELECT OFFSET(6) NUMBITS(1) [
             Deselect = 0,
@@ -141,6 +141,12 @@ impl Registers {
             wx: 0,
         }
     }
+
+    fn set_status_reg(&mut self, new_val: u8) {
+        const RO_BITS: u8 = 0x7;
+        self.status
+            .set((self.status.get() & RO_BITS) | (new_val & !RO_BITS));
+    }
 }
 
 impl sm83::memory::Memory for Registers {
@@ -166,10 +172,10 @@ impl sm83::memory::Memory for Registers {
     fn write(&mut self, address: sm83::memory::Address, value: u8) {
         match address {
             0xFF40 => self.lcdc.set(value),
-            0xFF41 => self.status.set(value),
+            0xFF41 => self.set_status_reg(value),
             0xFF42 => self.scy = value,
             0xFF43 => self.scx = value,
-            0xFF44 => self.ly = value,
+            0xFF44 => {}
             0xFF45 => self.lyc = value,
             0xFF47 => self.bg_palette = value.into(),
             0xFF48 => self.obj_palette0 = value.into(),
