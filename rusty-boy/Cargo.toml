@@ -11,3 +11,4 @@ ppu = { path =  "../ppu", version = "0.1.0" }
 anyhow = "1.0"
 png = "0.17"
 sdl2 = "0.36"
+clap = { version = "4.5.4", features = ["derive"] }
