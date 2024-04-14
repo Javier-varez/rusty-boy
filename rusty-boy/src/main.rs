@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
+use anyhow::bail;
 use clap::Parser;
 use ppu::{Color, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
@@ -73,13 +74,16 @@ fn main() -> anyhow::Result<()> {
         .position_centered()
         .build()?;
 
-    let mut canvas = window.into_canvas().build()?;
-    canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0xff, 0));
-    canvas.clear();
-    canvas.present();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    let surface = window.surface(&event_pump).unwrap();
+    let sdl2::pixels::PixelFormatEnum::ARGB8888 = surface.pixel_format_enum() else {
+        bail!(
+            "Unsupported pixel format: {:?}",
+            surface.pixel_format_enum()
+        );
+    };
 
     let mut frame_id = 0;
-    let mut event_pump = sdl_context.event_pump().unwrap();
 
     let mut next_deadline = Instant::now();
     let mut start = Instant::now();
@@ -108,30 +112,34 @@ fn main() -> anyhow::Result<()> {
             save_png(frame_id, frame)?;
         }
 
-        for (y, line) in frame.iter().enumerate() {
-            for (x, p) in line.iter().enumerate() {
+        let mut surface = window.surface(&event_pump).unwrap();
+        surface.with_lock_mut(|p| {
+            let pixel_iter = frame.iter().map(|l| l.iter()).flatten();
+
+            // The size of each ARGB8888 pixel is 4 bytes
+            const PIXEL_SIZE: usize = 4;
+            for (dest, src) in p.chunks_mut(PIXEL_SIZE).zip(pixel_iter) {
                 const MAX: u8 = 255;
-                let color = match p {
+                let color = match src {
                     Color::White => MAX,
                     Color::LightGrey => MAX / 3 * 2,
                     Color::DarkGrey => MAX / 3,
                     Color::Black => 0,
                 };
-                canvas.set_draw_color(sdl2::pixels::Color::RGB(color, color, color));
-                canvas
-                    .draw_point(sdl2::rect::Point::new(x as i32, y as i32))
-                    .unwrap();
+                dest[0] = color; // B
+                dest[1] = color; // G
+                dest[2] = color; // R
+                dest[3] = 0xFF; // A
             }
-        }
-
-        canvas.present();
+        });
+        surface.finish().unwrap();
 
         {
             let now = Instant::now();
             let duration = now - start;
             if duration > Duration::from_secs(1) {
                 let load_pct = load.as_nanos() as f64 / duration.as_nanos() as f64 * 100.0;
-                println!("CPU usage is {}", load_pct);
+                println!("CPU usage is {} %", load_pct);
                 start = now;
                 load = Duration::from_secs(0);
             }
