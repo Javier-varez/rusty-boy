@@ -8,10 +8,14 @@ use crate::memory::GbAddressSpace;
 use ppu::{Color, Ppu, PpuResult, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use sm83::core::{Cpu, Interrupts};
 
+use self::memory::{Hram, Wram};
+
 pub struct RustyBoy {
     rom: FileRom,
     cpu: Cpu,
     ppu: Ppu,
+    wram: Wram,
+    hram: Hram,
 }
 
 impl RustyBoy {
@@ -23,8 +27,16 @@ impl RustyBoy {
         let ppu = Ppu::new();
         let mut cpu = Cpu::new();
         cpu.get_mut_regs().pc_reg = ENTRYPOINT;
+        let wram = Box::new([0; 0x2000]);
+        let hram = Box::new([0; 0x7F]);
 
-        Ok(Self { cpu, ppu, rom })
+        Ok(Self {
+            cpu,
+            ppu,
+            rom,
+            wram,
+            hram,
+        })
     }
 
     pub fn run_until_next_frame(
@@ -34,6 +46,8 @@ impl RustyBoy {
             let ppu = &mut self.ppu;
             let mut memory = GbAddressSpace {
                 rom: &mut self.rom,
+                wram: &mut self.wram,
+                hram: &mut self.hram,
                 ppu,
             };
 
