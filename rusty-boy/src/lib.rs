@@ -1,3 +1,7 @@
+pub mod file_rom;
+pub mod memory;
+pub mod rom;
+
 use crate::file_rom::FileRom;
 use crate::memory::GbAddressSpace;
 

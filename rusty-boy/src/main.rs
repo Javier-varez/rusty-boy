@@ -1,7 +1,3 @@
-mod file_rom;
-mod memory;
-mod rusty_boy;
-
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -9,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::bail;
 use clap::Parser;
-use ppu::{Color, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use ppu::{Color, Frame, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 use rusty_boy::RustyBoy;
 
@@ -61,6 +57,49 @@ pub fn sleep_until(deadline: Instant) {
     }
 }
 
+fn draw_surface_argb8888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()> {
+    let pixel_iter = frame.iter().map(|l| l.iter()).flatten();
+
+    // The size of each ARGB8888 pixel is 4 bytes
+    const PIXEL_SIZE: usize = 4;
+    for (dest, src) in surface.chunks_mut(PIXEL_SIZE).zip(pixel_iter) {
+        const MAX: u8 = 255;
+        let color = match src {
+            Color::White => MAX,
+            Color::LightGrey => MAX / 3 * 2,
+            Color::DarkGrey => MAX / 3,
+            Color::Black => 0,
+        };
+        dest[0] = color; // B
+        dest[1] = color; // G
+        dest[2] = color; // R
+        dest[3] = 0xFF; // A
+    }
+
+    Ok(())
+}
+
+fn draw_surface_rgb888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()> {
+    let pixel_iter = frame.iter().map(|l| l.iter()).flatten();
+
+    // The size of each RGB888 pixel is 4 bytes, last one is unused...
+    const PIXEL_SIZE: usize = 4;
+    for (dest, src) in surface.chunks_mut(PIXEL_SIZE).zip(pixel_iter) {
+        const MAX: u8 = 255;
+        let color = match src {
+            Color::White => MAX,
+            Color::LightGrey => MAX / 3 * 2,
+            Color::DarkGrey => MAX / 3,
+            Color::Black => 0,
+        };
+        dest[0] = color; // B
+        dest[1] = color; // G
+        dest[2] = color; // R
+    }
+
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
@@ -76,11 +115,13 @@ fn main() -> anyhow::Result<()> {
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let surface = window.surface(&event_pump).unwrap();
-    let sdl2::pixels::PixelFormatEnum::ARGB8888 = surface.pixel_format_enum() else {
-        bail!(
+    let update_surface_func = match surface.pixel_format_enum() {
+        sdl2::pixels::PixelFormatEnum::ARGB8888 => draw_surface_argb8888,
+        sdl2::pixels::PixelFormatEnum::RGB888 => draw_surface_rgb888,
+        _ => bail!(
             "Unsupported pixel format: {:?}",
             surface.pixel_format_enum()
-        );
+        ),
     };
 
     let mut frame_id = 0;
@@ -114,23 +155,7 @@ fn main() -> anyhow::Result<()> {
 
         let mut surface = window.surface(&event_pump).unwrap();
         surface.with_lock_mut(|p| {
-            let pixel_iter = frame.iter().map(|l| l.iter()).flatten();
-
-            // The size of each ARGB8888 pixel is 4 bytes
-            const PIXEL_SIZE: usize = 4;
-            for (dest, src) in p.chunks_mut(PIXEL_SIZE).zip(pixel_iter) {
-                const MAX: u8 = 255;
-                let color = match src {
-                    Color::White => MAX,
-                    Color::LightGrey => MAX / 3 * 2,
-                    Color::DarkGrey => MAX / 3,
-                    Color::Black => 0,
-                };
-                dest[0] = color; // B
-                dest[1] = color; // G
-                dest[2] = color; // R
-                dest[3] = 0xFF; // A
-            }
+            update_surface_func(p, frame).unwrap();
         });
         surface.finish().unwrap();
 

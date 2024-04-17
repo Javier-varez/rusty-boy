@@ -2,7 +2,8 @@
 resolver = "2"
 
 members = [
-    "ppu", "rusty-boy",
+    "ppu",
+    "rusty-boy",
     "sm83",
     "sm83_decoder_macros",
 ]
