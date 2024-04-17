@@ -6,11 +6,8 @@ use std::slice::Iter;
 
 use rusty_boy::rom::{Rom, RomHeader};
 
-use sm83::{
-    decoder::{
-        Bit, Condition, Register, RegisterPair, RegisterPairMem, RegisterPairStack, ResetTarget,
-    },
-    memory::Address,
+use sm83::decoder::{
+    Bit, Condition, Register, RegisterPair, RegisterPairMem, RegisterPairStack, ResetTarget,
 };
 
 /// Disassembles the given ROM, producing a stream of sm83 instructions
@@ -44,8 +41,7 @@ impl<'a> Disassembler<'a> {
 
     fn disassemble(&self) -> anyhow::Result<InstructionIter<Cloned<Iter<'a, u8>>>> {
         let mut entrypoint = None;
-        for (addr, insn) in InstructionIter::new(self.header()?.entrypoint, 0x100) {
-            println!("\t\t{:#x}\t{}", addr, insn);
+        for (_addr, insn) in InstructionIter::new(self.header()?.entrypoint, 0x100) {
             match insn {
                 Instruction::JpImm(imm) => {
                     entrypoint = Some(imm);
@@ -296,7 +292,7 @@ impl std::fmt::Display for Instruction {
                 write!(f, "ld A, [{:#x}]", *imm)
             }
             Instruction::Ld16RegImm(dest, imm) => {
-                write!(f, "ld {}, {:x}", Self::reg_pair_to_repr(*dest), *imm)
+                write!(f, "ld {}, {:#x}", Self::reg_pair_to_repr(*dest), *imm)
             }
             Instruction::Ld16IndImmSp(imm) => {
                 write!(f, "ld [{:#x}], SP", *imm)

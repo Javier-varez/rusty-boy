@@ -1117,14 +1117,14 @@ impl Cpu {
                 Cycles::new(4)
             }
             OpCode::JrImm => {
-                let target_offset = self.read_16_bit_immediate(memory) as i16;
+                let target_offset = self.read_8_bit_immediate(memory) as i8 as i16;
                 let pc = self.get_regs().pc_reg;
                 let target = (pc as i16).wrapping_add(target_offset) as u16;
                 self.get_mut_regs().pc_reg = target;
                 Cycles::new(12)
             }
             OpCode::JrCondImm(condition) => {
-                let target_offset = self.read_16_bit_immediate(memory) as i16;
+                let target_offset = self.read_8_bit_immediate(memory) as i8 as i16;
                 if self.check_condition(condition) {
                     let pc = self.get_regs().pc_reg;
                     let target = (pc as i16).wrapping_add(target_offset) as u16;

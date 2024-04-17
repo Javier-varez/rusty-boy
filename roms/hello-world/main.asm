@@ -17,7 +17,7 @@ EntryPoint:
 WaitVBlank:
   ld a, [rLY]
   cp 144
-  jp c, WaitVBlank
+  jr c, WaitVBlank
 
   ; Turn the LCD off
   ld a, 0
