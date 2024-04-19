@@ -568,7 +568,7 @@ impl Cpu {
             RegisterPairStack::AF => {
                 let (hi, lo) = (&mut regs.a_reg, &mut regs.flags);
                 *hi = ((value >> 8) & 0xff) as u8;
-                *lo = ((value & 0xff) as u8).into();
+                *lo = ((value & 0xf0) as u8).into(); // lo-bits are hardcoded to 0
                 return;
             }
         };
