@@ -80,14 +80,14 @@ impl Registers {
     const fn new() -> Self {
         Self {
             flags: Flags::new(),
-            a_reg: 0,
-            b_reg: 0,
-            c_reg: 0,
-            d_reg: 0,
-            e_reg: 0,
-            h_reg: 0,
-            l_reg: 0,
-            sp_reg: 0,
+            a_reg: 0x01,
+            b_reg: 0xff,
+            c_reg: 0x13,
+            d_reg: 0x00,
+            e_reg: 0xc1,
+            h_reg: 0x84,
+            l_reg: 0x03,
+            sp_reg: 0xfffe,
             pc_reg: 0,
             irq_en: false,
         }
