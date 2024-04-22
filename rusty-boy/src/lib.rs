@@ -1,3 +1,4 @@
+pub mod disassembler;
 pub mod file_rom;
 pub mod memory;
 pub mod rom;
@@ -8,9 +9,11 @@ use crate::memory::GbAddressSpace;
 use ppu::{Color, Ppu, PpuResult, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use sm83::core::{Cpu, Interrupts};
 
+use self::disassembler::Disassembler;
 use self::memory::{Hram, Wram};
 
 pub struct RustyBoy {
+    debug: bool,
     rom: FileRom,
     cpu: Cpu,
     ppu: Ppu,
@@ -31,6 +34,7 @@ impl RustyBoy {
         let hram = Box::new([0; 0x7F]);
 
         Ok(Self {
+            debug: false,
             cpu,
             ppu,
             rom,
@@ -39,10 +43,27 @@ impl RustyBoy {
         })
     }
 
+    pub fn enable_debug(&mut self) {
+        self.debug = true;
+    }
+
     pub fn run_until_next_frame(
         &mut self,
     ) -> anyhow::Result<&[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]> {
         loop {
+            if self.debug {
+                let disasm = Disassembler::new(self.rom.rom());
+                let pc = self.cpu.get_regs().pc_reg;
+                let pc = if pc >= 0xc000 {
+                    pc - 0xc000 + 0x4000
+                } else {
+                    pc
+                };
+                let inst = disasm.disassemble_single_inst(pc as usize).unwrap();
+                let regs = self.cpu.get_regs();
+                println!("{pc:#04x} {inst} -- {regs:#x?}");
+            }
+
             let ppu = &mut self.ppu;
             let mut memory = GbAddressSpace {
                 rom: &mut self.rom,

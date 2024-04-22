@@ -29,4 +29,8 @@ impl FileRom {
 
         Ok(Self { data })
     }
+
+    pub fn rom(&self) -> &[u8] {
+        &self.data
+    }
 }

@@ -19,6 +19,10 @@ struct Args {
     /// Saves PNG files with each frame to the current directory
     #[arg(short)]
     save_pngs: bool,
+
+    /// Enable debugging
+    #[arg(short)]
+    debug: bool,
 }
 
 fn save_png(idx: usize, frame: &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]) -> anyhow::Result<()> {
@@ -104,6 +108,9 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let mut rusty_boy = RustyBoy::new_with_rom(&args.rom_path)?;
+    if args.debug {
+        rusty_boy.enable_debug()
+    }
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsys = sdl_context.video().unwrap();
