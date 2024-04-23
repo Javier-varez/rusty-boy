@@ -100,6 +100,11 @@ register_bitfields! [
     ],
 ];
 
+pub struct DmaConfig {
+    pub(crate) triggered: bool,
+    pub(crate) address: u8,
+}
+
 pub struct Registers {
     // LCDC => 0xFF40
     pub(crate) lcdc: InMemoryRegister<u8, LCDC::Register>,
@@ -113,6 +118,8 @@ pub struct Registers {
     pub(crate) ly: u8,
     // LCD Y compare coordinate => 0xFF45
     pub(crate) lyc: u8,
+    // DMA Configuration register
+    pub(crate) dma_config: DmaConfig,
     // BG palette => 0xFF47
     pub(crate) bg_palette: Palette,
     // Obj palette 0 => 0xFF48
@@ -134,6 +141,10 @@ impl Registers {
             scx: 0,
             ly: 0,
             lyc: 0,
+            dma_config: DmaConfig {
+                triggered: false,
+                address: 0,
+            },
             bg_palette: Palette(0),
             obj_palette0: Palette(0),
             obj_palette1: Palette(0),
@@ -158,6 +169,7 @@ impl sm83::memory::Memory for Registers {
             0xFF43 => self.scx,
             0xFF44 => self.ly,
             0xFF45 => self.lyc,
+            0xFF46 => self.dma_config.address,
             0xFF47 => self.bg_palette.into(),
             0xFF48 => self.obj_palette0.into(),
             0xFF49 => self.obj_palette1.into(),
@@ -177,6 +189,10 @@ impl sm83::memory::Memory for Registers {
             0xFF43 => self.scx = value,
             0xFF44 => {}
             0xFF45 => self.lyc = value,
+            0xFF46 => {
+                self.dma_config.triggered = true;
+                self.dma_config.address = value;
+            }
             0xFF47 => self.bg_palette = value.into(),
             0xFF48 => self.obj_palette0 = value.into(),
             0xFF49 => self.obj_palette1 = value.into(),

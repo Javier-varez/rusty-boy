@@ -1,8 +1,10 @@
+pub mod dma;
 pub mod modes;
 pub mod oam;
 pub mod regs;
 pub mod vram;
 
+use dma::DmaEngine;
 use modes::Mode;
 use oam::Oam;
 use regs::Registers;
@@ -62,9 +64,10 @@ impl From<Palette> for u8 {
 pub const DISPLAY_WIDTH: usize = 160;
 pub const DISPLAY_HEIGHT: usize = 144;
 
-pub enum PpuResult<'a> {
+#[derive(PartialEq, Eq, Debug)]
+pub enum PpuResult {
     InProgress(Mode),
-    FrameComplete(&'a [[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]),
+    FrameComplete,
 }
 
 pub type Frame = [[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT];
@@ -132,12 +135,16 @@ impl Ppu {
     }
 
     /// Runs the PPU for the given number of cycles and then returns the PPU state
-    pub fn run(&mut self, cycles: Cycles) -> PpuResult {
+    pub fn run(&mut self, cycles: Cycles, dma_engine: &mut DmaEngine) -> PpuResult {
         self.cycles = (self.cycles + cycles).wrap(CYCLES_PER_FRAME);
 
         let line = current_line(self.cycles);
         let new_mode = mode_for_current_cycle_count(self.cycles);
 
+        if self.regs.dma_config.triggered {
+            dma_engine.trigger(self.regs.dma_config.address);
+            self.regs.dma_config.triggered = false;
+        }
         self.step(new_mode, line)
     }
 
@@ -168,7 +175,7 @@ impl Ppu {
                 // Frame is complete
                 self.update_registers(line);
 
-                return PpuResult::FrameComplete(&self.framebuffer);
+                return PpuResult::FrameComplete;
             }
         }
 

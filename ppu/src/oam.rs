@@ -85,14 +85,18 @@ impl Object {
     }
 }
 
-const NUM_OBJECTS: usize = 40;
+/// The number of objects that fit in the OAM
+pub const NUM_OBJECTS: usize = 40;
+
+/// The size of the OAM RAM in bytes
+pub const OAM_SIZE: usize = OBJECT_SIZE * NUM_OBJECTS;
 
 #[repr(C)]
 pub struct Oam {
     objects: [Object; NUM_OBJECTS],
 }
 
-assert_eq_size!([u8; 160], Oam);
+assert_eq_size!([u8; OAM_SIZE], Oam);
 
 impl Oam {
     const OAM_BASE: usize = 0xFE00;

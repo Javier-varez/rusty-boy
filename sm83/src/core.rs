@@ -3,6 +3,7 @@ use crate::{
         self, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairMem, RegisterPairStack,
         ResetTarget,
     },
+    interrupts::{Interrupt, Interrupts},
     memory::Memory,
 };
 
@@ -317,95 +318,6 @@ const fn translate_reset_target(target: ResetTarget) -> u16 {
     }
 }
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Interrupt {
-    Vblank = 0x01,
-    Lcd = 0x02,
-    Timer = 0x04,
-    Serial = 0x08,
-    Joypad = 0x10,
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Interrupts(u8);
-
-impl From<Interrupt> for Interrupts {
-    fn from(value: Interrupt) -> Self {
-        Self(value as u8)
-    }
-}
-
-impl core::ops::BitOr<Self> for Interrupts {
-    type Output = Self;
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self(self.0 | rhs.0)
-    }
-}
-
-impl core::ops::BitOr<Interrupt> for Interrupts {
-    type Output = Self;
-    fn bitor(self, rhs: Interrupt) -> Self::Output {
-        Self(self.0 | rhs as u8)
-    }
-}
-
-impl core::ops::BitAnd<Self> for Interrupts {
-    type Output = Self;
-    fn bitand(self, rhs: Self) -> Self::Output {
-        Self(self.0 & rhs.0)
-    }
-}
-
-const ALL_INTERRUPTS: Interrupts = Interrupts(
-    (Interrupt::Vblank as u8)
-        | (Interrupt::Lcd as u8)
-        | (Interrupt::Timer as u8)
-        | (Interrupt::Lcd as u8)
-        | (Interrupt::Joypad as u8),
-);
-
-impl core::ops::Not for Interrupts {
-    type Output = Self;
-
-    fn not(self) -> Self::Output {
-        Self(!self.0 & ALL_INTERRUPTS.0)
-    }
-}
-
-impl Default for Interrupts {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Interrupts {
-    pub const fn new() -> Self {
-        Self(0)
-    }
-
-    pub fn highest_priority(self) -> Option<Interrupt> {
-        let trailing_zeros = self.0.trailing_zeros();
-        match trailing_zeros {
-            0 => Some(Interrupt::Vblank),
-            1 => Some(Interrupt::Lcd),
-            2 => Some(Interrupt::Timer),
-            3 => Some(Interrupt::Serial),
-            4 => Some(Interrupt::Joypad),
-            _ => None,
-        }
-    }
-
-    pub fn acknowledge(self, other: Interrupt) -> Self {
-        let other: Interrupts = other.into();
-        self & !other
-    }
-
-    pub fn has_any(self) -> bool {
-        self.0 != 0
-    }
-}
-
 const fn translate_irq_target(interrupt: Interrupt) -> u16 {
     match interrupt {
         Interrupt::Vblank => 0x40,
@@ -440,6 +352,14 @@ impl core::ops::Add<Cycles> for Cycles {
     }
 }
 
+impl core::ops::Sub<Cycles> for Cycles {
+    type Output = Cycles;
+
+    fn sub(self, rhs: Cycles) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
 impl From<usize> for Cycles {
     fn from(value: usize) -> Self {
         Self(value)
@@ -454,7 +374,7 @@ impl From<Cycles> for usize {
 
 pub enum ExitReason {
     Step(Cycles),
-    InterruptTaken(Interrupt),
+    InterruptTaken(Cycles, Interrupt),
     Stop(Cycles),
     Halt(Cycles),
     IllegalOpcode,
@@ -675,7 +595,7 @@ impl Cpu {
             let return_addr = self.get_regs().pc_reg;
             self.stack_push(memory, return_addr);
             self.get_mut_regs().pc_reg = translate_irq_target(irq);
-            ExitReason::InterruptTaken(irq)
+            ExitReason::InterruptTaken(Cycles::new(20), irq)
         } else {
             let instruction = self.fetch_and_decode(memory);
             self.execute(memory, instruction)
