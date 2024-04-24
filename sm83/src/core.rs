@@ -741,7 +741,7 @@ impl Cpu {
             OpCode::SubRegReg(dest, src) => {
                 let src_val = self.get_reg(src);
                 let dest_val = self.get_reg(dest);
-                let (result, flags) = sub(src_val, dest_val, false);
+                let (result, flags) = sub(dest_val, src_val, false);
                 self.set_reg(dest, result);
                 self.set_flags(flags);
                 Cycles::new(4)
@@ -773,7 +773,7 @@ impl Cpu {
             OpCode::SbcRegReg(dest, src) => {
                 let src_val = self.get_reg(src);
                 let dest_val = self.get_reg(dest);
-                let (result, flags) = sub(src_val, dest_val, self.get_flag(Flag::C));
+                let (result, flags) = sub(dest_val, src_val, self.get_flag(Flag::C));
                 self.set_reg(dest, result);
                 self.set_flags(flags);
                 Cycles::new(4)
@@ -789,7 +789,7 @@ impl Cpu {
             OpCode::CpRegReg(dest, src) => {
                 let src_val = self.get_reg(src);
                 let dest_val = self.get_reg(dest);
-                let (_, flags) = sub(src_val, dest_val, false);
+                let (_, flags) = sub(dest_val, src_val, false);
                 self.set_flags(flags);
                 Cycles::new(4)
             }
