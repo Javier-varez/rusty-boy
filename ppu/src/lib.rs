@@ -8,11 +8,15 @@ use dma::DmaEngine;
 use modes::Mode;
 use oam::Oam;
 use regs::Registers;
-use sm83::core::Cycles;
+use sm83::{
+    core::Cycles,
+    interrupts::{Interrupt, Interrupts},
+};
 use tock_registers::interfaces::{ReadWriteable, Readable};
 use vram::Vram;
 
-use self::vram::TILE_WIDTH;
+use regs::STAT;
+use vram::TILE_WIDTH;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Color {
@@ -80,6 +84,7 @@ pub struct Ppu {
 
     mode: Mode,
     cycles: Cycles,
+    stat_irq: bool,
 
     /// Origin of coordinates is top-left pixel.
     framebuffer: Frame,
@@ -126,6 +131,7 @@ impl Ppu {
 
             mode: Mode::OamScan,
             cycles: Cycles::new(0),
+            stat_irq: false,
             framebuffer: [[Color::White; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
         }
     }
@@ -135,7 +141,7 @@ impl Ppu {
     }
 
     /// Runs the PPU for the given number of cycles and then returns the PPU state
-    pub fn run(&mut self, cycles: Cycles, dma_engine: &mut DmaEngine) -> PpuResult {
+    pub fn run(&mut self, cycles: Cycles, dma_engine: &mut DmaEngine) -> (Interrupts, PpuResult) {
         self.cycles = (self.cycles + cycles).wrap(CYCLES_PER_FRAME);
 
         let line = current_line(self.cycles);
@@ -145,17 +151,42 @@ impl Ppu {
             dma_engine.trigger(self.regs.dma_config.address);
             self.regs.dma_config.triggered = false;
         }
-        self.step(new_mode, line)
+        let (interrupts, result) = self.step(new_mode, line);
+        (interrupts | self.update_lcd_irq(), result)
     }
 
     pub fn frame(&self) -> &Frame {
         &self.framebuffer
     }
 
-    fn step(&mut self, new_mode: Mode, line: usize) -> PpuResult {
+    fn update_lcd_irq(&mut self) -> Interrupts {
+        let lyc_eq_ly = self.regs.status.read(STAT::LYC_INT_SELECT) != 0
+            && self.regs.status.read(STAT::LYC_EQ_LY) != 0;
+        let mode0_irq =
+            self.regs.status.read(STAT::MODE_0_INT_SELECT) != 0 && self.mode == Mode::Hblank;
+        let mode1_irq =
+            self.regs.status.read(STAT::MODE_1_INT_SELECT) != 0 && self.mode == Mode::Vblank;
+        let mode2_irq =
+            self.regs.status.read(STAT::MODE_2_INT_SELECT) != 0 && self.mode == Mode::OamScan;
+        let status = lyc_eq_ly || mode0_irq || mode1_irq || mode2_irq;
+
+        if !self.stat_irq && status {
+            self.stat_irq = true;
+            return Interrupt::Lcd.into();
+        }
+
+        if self.stat_irq && !status {
+            self.stat_irq = false;
+        }
+
+        Interrupts::new()
+    }
+
+    fn step(&mut self, new_mode: Mode, line: usize) -> (Interrupts, PpuResult) {
+        const NO_IRQ: Interrupts = Interrupts::new();
         if self.mode == new_mode {
             self.update_registers(line);
-            return PpuResult::InProgress(self.mode);
+            return (NO_IRQ, PpuResult::InProgress(self.mode));
         }
 
         self.mode = new_mode;
@@ -174,13 +205,12 @@ impl Ppu {
             Mode::Vblank => {
                 // Frame is complete
                 self.update_registers(line);
-
-                return PpuResult::FrameComplete;
+                return (Interrupt::Vblank.into(), PpuResult::FrameComplete);
             }
         }
 
         self.update_registers(line);
-        PpuResult::InProgress(self.mode)
+        (NO_IRQ, PpuResult::InProgress(self.mode))
     }
 
     fn draw_line(&mut self, line_idx: usize) {

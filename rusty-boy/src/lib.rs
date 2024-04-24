@@ -43,11 +43,6 @@ impl RustyBoy {
         if self.debug {
             let disasm = Disassembler::new(self.address_space.rom.rom());
             let pc = self.cpu.get_regs().pc_reg;
-            let pc = if pc >= 0xc000 {
-                pc - 0xc000 + 0x4000
-            } else {
-                pc
-            };
             let inst = disasm.disassemble_single_inst(pc as usize).unwrap();
             let regs = self.cpu.get_regs();
             println!("{pc:#04x} {inst} -- {regs:#x?}");
@@ -72,7 +67,8 @@ impl RustyBoy {
             }
         };
 
-        let ppu_result = self.address_space.ppu.run(cycles, &mut self.dma_engine);
+        let (interrupts, ppu_result) = self.address_space.ppu.run(cycles, &mut self.dma_engine);
+        self.address_space.interrupt_regs.trigger(interrupts);
         self.dma_engine.run(cycles, &mut self.address_space);
 
         ppu_result

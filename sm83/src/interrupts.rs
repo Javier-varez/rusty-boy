@@ -22,6 +22,10 @@ impl InterruptRegs {
     pub fn acknowledge(&mut self, interrupt: Interrupt) {
         self.flags_reg = self.flags_reg.acknowledge(interrupt);
     }
+
+    pub fn trigger(&mut self, interrupts: Interrupts) {
+        self.flags_reg = self.flags_reg | interrupts;
+    }
 }
 
 impl crate::memory::Memory for InterruptRegs {
