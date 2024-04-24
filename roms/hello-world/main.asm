@@ -2,6 +2,9 @@
 
 INCLUDE "hardware.inc"
 
+SECTION "Stat", ROM0[$48]
+  jp HandleStat
+
 SECTION "Header", ROM0[$100]
 
   jp EntryPoint
@@ -57,25 +60,62 @@ CopyTilemap:
   ld a, %11100100
   ld [rBGP], a
 
-  ; Scroll
-Scroll:
-WaitVBlankBeforeScrolling:
-  ld a, [rLY]
-  cp 144
-  jp c, WaitVBlankBeforeScrolling
+  ; Enable LCD IRQ
+  ld a, $02
+  ld [rIE], a
 
-  ; Increment SCX
-  ld a, [rSCX]
-  add a, $1
+  ; Enable LYC irq
+  ld a, $40
+  ld [rSTAT], a
+
+  ; Set LYC register to line 144 (vblank)
+  ld a, 144
+  ld [rLYC], a
+
+  ld hl, LinePattern
+  ld b, 0
+
+  ; Enable interrupts to allow processing VBLANK updates
+  ei
+
+End:
+  jp End
+
+HandleStat:
+  ; Set next param
+  ld a, [hl+]
+  sub a, 20
   ld [rSCX], a
 
-WaitVBlankEnd:
   ld a, [rLY]
   cp 144
-  jp nc, WaitVBlankEnd
+  jp nc, ResetLyc
 
-  ; And keep scrolling
-  jp Scroll
+  inc a
+  ld [rLYC], a
+
+  reti
+
+ResetLyc:
+  ld a, $0
+  ld [rLYC], a
+
+  inc b
+  ld a, 144 ; max line
+  cp a, b
+  jp nz, LoadHl
+  ld b, 0
+
+LoadHl:
+  ld hl, LinePattern
+  ld a, l
+  add a, b
+  ld l, a
+  ld a, h
+  adc a, 0
+  ld h, a
+
+  reti
 
 SECTION "Tile data", ROM0
 
@@ -174,3 +214,43 @@ Tilemap:
   db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,  0,0,0,0,0,0,0,0,0,0,0,0
   db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,  0,0,0,0,0,0,0,0,0,0,0,0
 TilemapEnd:
+
+SECTION "LinePattern", ROM0
+LinePattern:
+ db 20, 20, 21, 22, 23, 24, 25, 26
+ db 26, 27, 28, 29, 30, 30, 31, 32
+ db 32, 33, 34, 34, 35, 35, 36, 36
+ db 37, 37, 38, 38, 38, 39, 39, 39
+ db 39, 39, 39, 39, 39, 39, 39, 39
+ db 39, 39, 39, 38, 38, 38, 38, 37
+ db 37, 36, 36, 35, 35, 34, 33, 33
+ db 32, 31, 31, 30, 29, 28, 28, 27
+ db 26, 25, 24, 23, 23, 22, 21, 20
+ db 19, 18, 17, 16, 16, 15, 14, 13
+ db 12, 11, 11, 10, 09, 08, 08, 07
+ db 06, 06, 05, 04, 04, 03, 03, 02
+ db 02, 01, 01, 01, 01, 00, 00, 00
+ db 00, 00, 00, 00, 00, 00, 00, 00
+ db 00, 00, 00, 01, 01, 01, 02, 02
+ db 03, 03, 04, 04, 05, 05, 06, 07
+ db 07, 08, 09, 09, 10, 11, 12, 13
+ db 13, 14, 15, 16, 17, 18, 19, 19
+
+ db 20, 20, 21, 22, 23, 24, 25, 26
+ db 26, 27, 28, 29, 30, 30, 31, 32
+ db 32, 33, 34, 34, 35, 35, 36, 36
+ db 37, 37, 38, 38, 38, 39, 39, 39
+ db 39, 39, 39, 39, 39, 39, 39, 39
+ db 39, 39, 39, 38, 38, 38, 38, 37
+ db 37, 36, 36, 35, 35, 34, 33, 33
+ db 32, 31, 31, 30, 29, 28, 28, 27
+ db 26, 25, 24, 23, 23, 22, 21, 20
+ db 19, 18, 17, 16, 16, 15, 14, 13
+ db 12, 11, 11, 10, 09, 08, 08, 07
+ db 06, 06, 05, 04, 04, 03, 03, 02
+ db 02, 01, 01, 01, 01, 00, 00, 00
+ db 00, 00, 00, 00, 00, 00, 00, 00
+ db 00, 00, 00, 01, 01, 01, 02, 02
+ db 03, 03, 04, 04, 05, 05, 06, 07
+ db 07, 08, 09, 09, 10, 11, 12, 13
+ db 13, 14, 15, 16, 17, 18, 19, 19
