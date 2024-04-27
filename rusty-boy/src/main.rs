@@ -106,6 +106,8 @@ fn draw_surface_rgb888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()> 
 }
 
 fn main() -> anyhow::Result<()> {
+    env_logger::init();
+
     let args = Args::parse();
 
     let rom_data = std::fs::read(args.rom_path)?;
@@ -176,7 +178,7 @@ fn main() -> anyhow::Result<()> {
             let duration = now - start;
             if duration > Duration::from_secs(1) {
                 let load_pct = load.as_nanos() as f64 / duration.as_nanos() as f64 * 100.0;
-                println!("CPU usage is {} %", load_pct);
+                log::info!("CPU usage is {} %", load_pct);
                 start = now;
                 load = Duration::from_secs(0);
             }

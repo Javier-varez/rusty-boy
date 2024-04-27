@@ -39,7 +39,7 @@ impl<'a> RustyBoy<'a> {
             let pc = self.cpu.get_regs().pc_reg;
             let inst = disassembler::disassemble_single_inst(&mut self.address_space, pc);
             let regs = self.cpu.get_regs();
-            println!("{pc:#04x} {inst} -- {regs:#x?}");
+            log::trace!("{pc:#04x} {inst} -- {regs:x?}");
         }
 
         let interrupts = self.address_space.interrupt_regs.active_interrupts();
