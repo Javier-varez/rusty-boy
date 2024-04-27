@@ -1,5 +1,6 @@
 pub mod disassembler;
 pub mod file_rom;
+pub mod joypad;
 pub mod memory;
 pub mod rom;
 
