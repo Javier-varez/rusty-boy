@@ -687,13 +687,13 @@ impl Cpu {
             }
             OpCode::Ld8IndImmAcc => {
                 let imm = self.read_16_bit_immediate(memory);
-                let addr = 0xFF00 | imm;
+                let addr = imm;
                 memory.write(addr, self.get_regs().a_reg);
                 Cycles::new(16)
             }
             OpCode::Ld8AccIndImm => {
                 let imm = self.read_16_bit_immediate(memory);
-                let addr = 0xFF00 | imm;
+                let addr = imm;
                 let value = memory.read(addr);
                 self.get_mut_regs().a_reg = value;
                 Cycles::new(16)
