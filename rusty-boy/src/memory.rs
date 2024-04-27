@@ -1,12 +1,13 @@
-use crate::{file_rom::FileRom, joypad::Joypad};
+use crate::joypad::Joypad;
+use cartridge::Cartridge;
 use ppu::Ppu;
 use sm83::interrupts::InterruptRegs;
 
 pub type Wram = Box<[u8; 0x2000]>;
 pub type Hram = Box<[u8; 0x7f]>;
 
-pub struct GbAddressSpace {
-    pub rom: FileRom,
+pub struct GbAddressSpace<'a> {
+    pub cartridge: Cartridge<'a>,
     pub ppu: Ppu,
     pub wram: Wram,
     pub hram: Hram,
@@ -14,10 +15,10 @@ pub struct GbAddressSpace {
     pub joypad: Joypad,
 }
 
-impl GbAddressSpace {
-    pub fn new(rom: FileRom) -> Self {
+impl<'a> GbAddressSpace<'a> {
+    pub fn new(cartridge: Cartridge<'a>) -> Self {
         Self {
-            rom,
+            cartridge,
             ppu: Ppu::new(),
             wram: Box::new([0; 0x2000]),
             hram: Box::new([0; 0x7f]),
@@ -27,10 +28,10 @@ impl GbAddressSpace {
     }
 }
 
-impl sm83::memory::Memory for GbAddressSpace {
+impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
     fn read(&mut self, address: sm83::memory::Address) -> u8 {
         match address {
-            0x0000..=0x7FFF => self.rom.read(address),
+            0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cartridge.read(address),
             0xC000..=0xDFFF => self.wram[address as usize - 0xC000],
             0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80],
             0x8000..=0x9FFF | 0xFE00..=0xFE9F | 0xFF40..=0xFF4B => self.ppu.read(address),
@@ -46,7 +47,7 @@ impl sm83::memory::Memory for GbAddressSpace {
 
     fn write(&mut self, address: sm83::memory::Address, value: u8) {
         match address {
-            0x0000..=0x7fff => self.rom.write(address, value),
+            0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cartridge.write(address, value),
             0xC000..=0xDFFF => {
                 self.wram[address as usize - 0xC000] = value;
             }

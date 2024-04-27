@@ -4,6 +4,7 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use anyhow::bail;
+use cartridge::Cartridge;
 use clap::Parser;
 use ppu::{Color, Frame, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
@@ -107,7 +108,11 @@ fn draw_surface_rgb888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()> 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut rusty_boy = RustyBoy::new_with_rom(&args.rom_path)?;
+    let rom_data = std::fs::read(args.rom_path)?;
+    let cartridge =
+        Cartridge::new(&rom_data).map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?;
+    let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge)?;
+
     if args.debug {
         rusty_boy.enable_debug()
     }

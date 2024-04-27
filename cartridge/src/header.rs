@@ -1,61 +1,9 @@
-/// Represents an in-memory ROM file for the Game Boy
-pub struct Rom<'a> {
-    data: &'a [u8],
-}
-
-impl<'a> Rom<'a> {
-    pub fn new(data: &'a [u8]) -> Self {
-        Self { data }
-    }
-
-    pub fn header(&'a self) -> Result<RomHeader<'a>, Error> {
-        if self.data.len() < 0x150 {
-            return Err(Error::NoHeader);
-        }
-
-        let title = &self.data[0x134..0x144];
-        let title_length = title.iter().take_while(|b| **b != 0).count();
-        let title = &title[..title_length];
-        let title = std::str::from_utf8(title).map_err(|_| Error::InvalidTitle)?;
-
-        let manufacturer_code = if title.len() > 11 {
-            None
-        } else {
-            Some(&self.data[0x13f..0x143])
-        };
-        let cgb_flag = if title.len() > 14 {
-            None
-        } else {
-            Some(self.data[0x143])
-        };
-
-        let licensee = if self.data[0x14B] == 0x33 {
-            Licensee::New([self.data[0x144], self.data[0x145]])
-        } else {
-            Licensee::Old(self.data[0x14B])
-        };
-
-        let rom_size = (32 * 1024) << self.data[0x148] as usize;
-        let ram_size = self.data[0x149].into();
-
-        Ok(RomHeader {
-            entrypoint: &self.data[0x100..0x104],
-            logo: &self.data[0x104..0x134],
-            title,
-            manufacturer_code,
-            cgb_flag,
-            licensee,
-            rom_size,
-            ram_size,
-        })
-    }
-}
-
 pub enum Licensee {
     Old(u8),
     New([u8; 2]),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum RamSize {
     None,
     KiloBytes8,
@@ -65,8 +13,21 @@ pub enum RamSize {
     Unknown(u8),
 }
 
-impl std::fmt::Display for RamSize {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl RamSize {
+    pub fn into_usize(self) -> Option<usize> {
+        match self {
+            Self::None => Some(0),
+            Self::KiloBytes8 => Some(8 * 1024),
+            Self::KiloBytes32 => Some(32 * 1024),
+            Self::KiloBytes128 => Some(128 * 1024),
+            Self::KiloBytes64 => Some(64 * 1024),
+            Self::Unknown(_) => None,
+        }
+    }
+}
+
+impl core::fmt::Display for RamSize {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             RamSize::None => write!(f, "None"),
             RamSize::KiloBytes8 => write!(f, "8 KiB"),
@@ -78,6 +39,20 @@ impl std::fmt::Display for RamSize {
     }
 }
 
+impl From<u8> for RamSize {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => RamSize::None,
+            2 => RamSize::KiloBytes8,
+            3 => RamSize::KiloBytes32,
+            4 => RamSize::KiloBytes128,
+            5 => RamSize::KiloBytes64,
+            v => RamSize::Unknown(v),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum CartridgeType {
     RomOnly,
     Mbc1,
@@ -146,16 +121,9 @@ impl From<u8> for CartridgeType {
     }
 }
 
-impl From<u8> for RamSize {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => RamSize::None,
-            2 => RamSize::KiloBytes8,
-            3 => RamSize::KiloBytes32,
-            4 => RamSize::KiloBytes128,
-            5 => RamSize::KiloBytes64,
-            v => RamSize::Unknown(v),
-        }
+impl core::fmt::Display for CartridgeType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -165,19 +133,13 @@ pub enum Error {
     InvalidTitle,
 }
 
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-pub struct RomHeader<'a> {
+pub struct CartridgeHeader<'a> {
     pub entrypoint: &'a [u8],
     pub logo: &'a [u8],
     pub title: &'a str,
@@ -186,4 +148,52 @@ pub struct RomHeader<'a> {
     pub licensee: Licensee,
     pub rom_size: usize,
     pub ram_size: RamSize,
+    pub cartridge_type: CartridgeType,
+}
+
+impl<'a> CartridgeHeader<'a> {
+    pub fn new(data: &'a [u8]) -> Result<Self, Error> {
+        if data.len() < 0x150 {
+            return Err(Error::NoHeader);
+        }
+
+        let title = &data[0x134..0x144];
+        let title_length = title.iter().take_while(|b| **b != 0).count();
+        let title = &title[..title_length];
+        let title = core::str::from_utf8(title).map_err(|_| Error::InvalidTitle)?;
+
+        let manufacturer_code = if title.len() > 11 {
+            None
+        } else {
+            Some(&data[0x13f..0x143])
+        };
+        let cgb_flag = if title.len() > 14 {
+            None
+        } else {
+            Some(data[0x143])
+        };
+
+        let licensee = if data[0x14B] == 0x33 {
+            Licensee::New([data[0x144], data[0x145]])
+        } else {
+            Licensee::Old(data[0x14B])
+        };
+
+        let ty: CartridgeType = data[0x147].into();
+
+        let rom_size = (32 * 1024) << data[0x148] as usize;
+        let ram_size = data[0x149].into();
+
+        Ok(CartridgeHeader {
+            entrypoint: &data[0x100..0x104],
+            logo: &data[0x104..0x134],
+            title,
+            manufacturer_code,
+            cgb_flag,
+            licensee,
+            rom_size,
+            ram_size,
+            cartridge_type: ty,
+        })
+    }
 }

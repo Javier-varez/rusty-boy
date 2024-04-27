@@ -6,4 +6,5 @@ members = [
     "rusty-boy",
     "sm83",
     "sm83_decoder_macros",
+    "cartridge",
 ]

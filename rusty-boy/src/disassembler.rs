@@ -1,28 +1,27 @@
 use std::iter::Cloned;
 use std::slice::Iter;
 
-use crate::rom::{Rom, RomHeader};
+use cartridge::header::CartridgeHeader;
 
 use anyhow::bail;
 use sm83::decoder::{
     Bit, Condition, Register, RegisterPair, RegisterPairMem, RegisterPairStack, ResetTarget,
 };
 
+use sm83::memory::Memory;
+
 pub struct Disassembler<'a> {
     data: &'a [u8],
-    rom: Rom<'a>,
 }
 
 impl<'a> Disassembler<'a> {
     pub fn new(data: &'a [u8]) -> Self {
-        Self {
-            data,
-            rom: Rom::new(data),
-        }
+        Self { data }
     }
 
-    pub fn header(&'a self) -> anyhow::Result<RomHeader<'a>> {
-        Ok(self.rom.header()?)
+    pub fn header(&'a self) -> anyhow::Result<CartridgeHeader<'a>> {
+        Ok(CartridgeHeader::new(self.data)
+            .map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?)
     }
 
     pub fn entrypoint(&'a self) -> anyhow::Result<InstructionIter<Cloned<Iter<'a, u8>>>> {
@@ -49,12 +48,24 @@ impl<'a> Disassembler<'a> {
             entrypoint as usize,
         ))
     }
+}
 
-    pub fn disassemble_single_inst(&self, addr: usize) -> Option<Instruction> {
-        InstructionIter::new(&self.data[addr..], addr)
-            .next()
-            .map(|e| e.1)
-    }
+pub fn disassemble_single_inst(
+    memory: &mut crate::memory::GbAddressSpace,
+    addr: sm83::memory::Address,
+) -> Instruction {
+    // An instruction is at most 3 bytes
+    let data = [
+        memory.read(addr),
+        memory.read(addr.wrapping_add(1)),
+        memory.read(addr.wrapping_add(2)),
+        memory.read(addr.wrapping_add(3)),
+    ];
+
+    InstructionIter::new(&data, addr as usize)
+        .next()
+        .map(|e| e.1)
+        .unwrap()
 }
 
 pub enum Instruction {

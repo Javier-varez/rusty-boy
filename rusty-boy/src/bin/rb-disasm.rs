@@ -25,6 +25,7 @@ fn main() -> anyhow::Result<()> {
     assert_eq!(header.rom_size % (32 * 1024), 0);
     println!("\tROM size: {} KiB", header.rom_size / 1024);
     println!("\tRAM size: {}", header.ram_size);
+    println!("\tType: {}", header.cartridge_type);
     println!("\tEntrypoint:");
     for (addr, insn) in disassembler.entrypoint()? {
         println!("\t\t{:#x}\t{}", addr, insn);

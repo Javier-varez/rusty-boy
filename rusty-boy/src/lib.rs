@@ -1,28 +1,22 @@
 pub mod disassembler;
-pub mod file_rom;
 pub mod joypad;
 pub mod memory;
-pub mod rom;
 
-use crate::file_rom::FileRom;
 use crate::memory::GbAddressSpace;
 
+use cartridge::Cartridge;
 use ppu::{dma::DmaEngine, Color, PpuResult, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use sm83::core::Cpu;
 
-use self::disassembler::Disassembler;
-
-pub struct RustyBoy {
+pub struct RustyBoy<'a> {
     cpu: Cpu,
     dma_engine: DmaEngine,
-    address_space: GbAddressSpace,
+    address_space: GbAddressSpace<'a>,
     debug: bool,
 }
 
-impl RustyBoy {
-    pub fn new_with_rom(path: &std::path::Path) -> anyhow::Result<Self> {
-        let rom = FileRom::from_file(&path)?;
-
+impl<'a> RustyBoy<'a> {
+    pub fn new_with_cartridge(cartridge: Cartridge<'a>) -> anyhow::Result<Self> {
         const ENTRYPOINT: u16 = 0x100;
 
         let mut cpu = Cpu::new();
@@ -32,7 +26,7 @@ impl RustyBoy {
             debug: false,
             cpu,
             dma_engine: DmaEngine::new(),
-            address_space: GbAddressSpace::new(rom),
+            address_space: GbAddressSpace::new(cartridge),
         })
     }
 
@@ -42,9 +36,8 @@ impl RustyBoy {
 
     fn step(&mut self) -> PpuResult {
         if self.debug {
-            let disasm = Disassembler::new(self.address_space.rom.rom());
             let pc = self.cpu.get_regs().pc_reg;
-            let inst = disasm.disassemble_single_inst(pc as usize).unwrap();
+            let inst = disassembler::disassemble_single_inst(&mut self.address_space, pc);
             let regs = self.cpu.get_regs();
             println!("{pc:#04x} {inst} -- {regs:#x?}");
         }
