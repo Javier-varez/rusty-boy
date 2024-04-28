@@ -2,6 +2,7 @@ use crate::joypad::Joypad;
 use cartridge::Cartridge;
 use ppu::Ppu;
 use sm83::interrupts::InterruptRegs;
+use timer::Timer;
 
 pub type Wram = Box<[u8; 0x2000]>;
 pub type Hram = Box<[u8; 0x7f]>;
@@ -13,6 +14,7 @@ pub struct GbAddressSpace<'a> {
     pub hram: Hram,
     pub interrupt_regs: InterruptRegs,
     pub joypad: Joypad,
+    pub timer: Timer,
 
     pub sb: u8,
     pub sc: u8,
@@ -28,6 +30,7 @@ impl<'a> GbAddressSpace<'a> {
             hram: Box::new([0; 0x7f]),
             interrupt_regs: InterruptRegs::new(),
             joypad: Joypad::new(),
+            timer: Timer::new(),
             sb: 0,
             sc: 0,
             serial_data: vec![],
@@ -45,6 +48,7 @@ impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
             0xFF00 => self.joypad.read(address),
             0xFF01 => self.sb,
             0xFF02 => self.sc,
+            0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F | 0xFFFF => self.interrupt_regs.read(address),
             0xFF00..=0xFF3F | 0xFF4C..=0xFF7F => {
                 log::trace!("Unimplemented read from I/O regs: {address:#x}");
@@ -74,6 +78,7 @@ impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
                 }
                 self.sc &= 0x7f;
             }
+            0xFF04..=0xFF07 => self.timer.write(address, value),
             0xFF0F | 0xFFFF => self.interrupt_regs.write(address, value),
             0xFF00..=0xFF3F | 0xFF4C..=0xFF7F => {
                 log::trace!("Unimplemented write to I/O regs: {address:#x} = {value:#x}")

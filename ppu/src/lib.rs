@@ -141,7 +141,7 @@ impl Ppu {
     }
 
     /// Runs the PPU for the given number of cycles and then returns the PPU state
-    pub fn run(&mut self, cycles: Cycles, dma_engine: &mut DmaEngine) -> (Interrupts, PpuResult) {
+    pub fn step(&mut self, cycles: Cycles, dma_engine: &mut DmaEngine) -> (Interrupts, PpuResult) {
         self.cycles = (self.cycles + cycles).wrap(CYCLES_PER_FRAME);
 
         let line = current_line(self.cycles);
@@ -151,7 +151,7 @@ impl Ppu {
             dma_engine.trigger(self.regs.dma_config.address);
             self.regs.dma_config.triggered = false;
         }
-        let (interrupts, result) = self.step(new_mode, line);
+        let (interrupts, result) = self.step_inner(new_mode, line);
         (interrupts | self.update_lcd_irq(), result)
     }
 
@@ -182,7 +182,7 @@ impl Ppu {
         Interrupts::new()
     }
 
-    fn step(&mut self, new_mode: Mode, line: usize) -> (Interrupts, PpuResult) {
+    fn step_inner(&mut self, new_mode: Mode, line: usize) -> (Interrupts, PpuResult) {
         const NO_IRQ: Interrupts = Interrupts::new();
         if self.mode == new_mode {
             self.update_registers(line);

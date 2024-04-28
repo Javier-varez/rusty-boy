@@ -12,6 +12,7 @@ name = "rb-disasm"
 sm83 = { path =  "../sm83", version = "0.1.0" }
 ppu = { path =  "../ppu", version = "0.1.0" }
 cartridge = { path =  "../cartridge", version = "0.1.0" }
+timer = { path =  "../timer", version = "0.1.0" }
 anyhow = "1.0"
 png = "0.17"
 sdl2 = "0.36"

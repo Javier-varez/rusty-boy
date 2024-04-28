@@ -61,9 +61,14 @@ impl<'a> RustyBoy<'a> {
             }
         };
 
-        let (interrupts, ppu_result) = self.address_space.ppu.run(cycles, &mut self.dma_engine);
-        self.address_space.interrupt_regs.trigger(interrupts);
+        let (ppu_interrupts, ppu_result) =
+            self.address_space.ppu.step(cycles, &mut self.dma_engine);
+        let timer_interrupts = self.address_space.timer.step(cycles);
         self.dma_engine.run(cycles, &mut self.address_space);
+
+        self.address_space
+            .interrupt_regs
+            .trigger(ppu_interrupts | timer_interrupts);
 
         ppu_result
     }
