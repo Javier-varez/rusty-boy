@@ -141,6 +141,10 @@ pub enum Instruction {
     Di,                                            // di
     Ei,                                            // ei
     Illegal,                                       // Illegal
+    Rlca,                                          // rlca
+    Rrca,                                          // rrca
+    Rla,                                           // rla
+    Rra,                                           // rra
     RlcReg(Register),                              // rlc Register
     RrcReg(Register),                              // rrc Register
     RlReg(Register),                               // rl Register
@@ -520,6 +524,18 @@ impl std::fmt::Display for Instruction {
             Instruction::Illegal => {
                 write!(f, "unk")
             }
+            Instruction::Rlca => {
+                write!(f, "rlca")
+            }
+            Instruction::Rrca => {
+                write!(f, "rrca")
+            }
+            Instruction::Rla => {
+                write!(f, "rla")
+            }
+            Instruction::Rra => {
+                write!(f, "rra")
+            }
             Instruction::RlcReg(reg) => {
                 write!(f, "rlc {}", Self::reg_to_repr(*reg))
             }
@@ -763,6 +779,10 @@ where
             sm83::decoder::OpCode::Di => Instruction::Di,
             sm83::decoder::OpCode::Ei => Instruction::Ei,
             sm83::decoder::OpCode::Illegal => Instruction::Illegal,
+            sm83::decoder::OpCode::Rlca => Instruction::Rlca,
+            sm83::decoder::OpCode::Rrca => Instruction::Rrca,
+            sm83::decoder::OpCode::Rla => Instruction::Rla,
+            sm83::decoder::OpCode::Rra => Instruction::Rra,
             sm83::decoder::OpCode::RlcReg(reg) => Instruction::RlcReg(reg),
             sm83::decoder::OpCode::RrcReg(reg) => Instruction::RrcReg(reg),
             sm83::decoder::OpCode::RlReg(reg) => Instruction::RlReg(reg),

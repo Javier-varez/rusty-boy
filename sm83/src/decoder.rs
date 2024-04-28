@@ -75,6 +75,10 @@ pub enum OpCode {
     Di,                                            // di
     Ei,                                            // ei
     Illegal,                                       // Illegal
+    Rlca,                                          // rlca
+    Rrca,                                          // rrca
+    Rla,                                           // rla Register
+    Rra,                                           // rra Register
     RlcReg(Register),                              // rlc Register
     RrcReg(Register),                              // rrc Register
     RlReg(Register),                               // rl Register
@@ -184,10 +188,10 @@ generate_decoder_tables! {
         [R: RegisterPair] "00RR0011" => { OpCode::IncRegPair(#R) },
         [R: RegisterPair] "00RR1011" => { OpCode::DecRegPair(#R) },
         [R: RegisterPair] "00RR1001" => { OpCode::AddRegPairRegPair(RegisterPair::HL, #R) },
-        [] "00000111" => { OpCode::RlcReg(Register::A) },
-        [] "00001111" => { OpCode::RrcReg(Register::A) },
-        [] "00010111" => { OpCode::RlReg(Register::A) },
-        [] "00011111" => { OpCode::RrReg(Register::A) },
+        [] "00000111" => { OpCode::Rlca },
+        [] "00001111" => { OpCode::Rrca },
+        [] "00010111" => { OpCode::Rla },
+        [] "00011111" => { OpCode::Rra },
         [] "00100111" => { OpCode::Daa },
         [] "00101111" => { OpCode::Cpl },
         [] "00110111" => { OpCode::Scf },

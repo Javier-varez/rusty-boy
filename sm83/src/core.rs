@@ -113,13 +113,14 @@ const fn carry_bit32(a: u32, b: u32, c: u32, bit: usize) -> bool {
     (xor & (1 << bit)) != 0
 }
 
-const fn add(a: u8, b: u8, carry: bool) -> (u8, Flags) {
+fn add(a: u8, b: u8, carry: bool) -> (u8, Flags) {
     let a = a as u16;
     let b = b as u16;
-    let result = a + b + if carry { 1 } else { 0 };
+    let carry = carry as u16;
+    let result = a + b + carry;
 
     let flags = Flags::new()
-        .with(Flag::Z, result == 0)
+        .with(Flag::Z, (result & 0xFF) == 0)
         .with(Flag::N, false)
         .with(Flag::H, carry_bit16(a, b, result, 4))
         .with(Flag::C, carry_bit16(a, b, result, 8));
@@ -141,16 +142,19 @@ const fn add16(a: u16, b: u16, flags: Flags) -> (u16, Flags) {
 }
 
 const fn sub(a: u8, b: u8, carry: bool) -> (u8, Flags) {
-    let carry = carry as u8;
-    let result = a.wrapping_sub(b).wrapping_sub(carry);
+    let a = a as u16;
+    let b = b as u16;
+    let carry = carry as u16;
+    let inv = (!(b + carry)).wrapping_add(1); // 2's compliment of a + b
+    let result = a + inv;
 
     let flags = Flags::new()
-        .with(Flag::Z, result == 0)
+        .with(Flag::Z, (result & 0xFF) == 0)
         .with(Flag::N, true)
-        .with(Flag::H, (0xf & b.wrapping_add(carry)) > (0xf & a))
-        .with(Flag::C, b > a);
+        .with(Flag::H, carry_bit16(a, b, result, 4))
+        .with(Flag::C, carry_bit16(a, b, result, 8));
 
-    (result, flags)
+    (result as u8, flags)
 }
 
 const fn and(a: u8, b: u8) -> (u8, Flags) {
@@ -206,43 +210,55 @@ const fn daa(a: u8, flags: Flags) -> (u8, Flags) {
     (result, flags)
 }
 
-const fn rlc(value: u8) -> (u8, Flags) {
+// Some variants of this instruction (rlca) always set Z to 0, but others actually compute the
+// result
+const fn rlc(value: u8, real_z: bool) -> (u8, Flags) {
     let carry = (value & 0x80) != 0;
     let mut shifted = value << 1;
     if carry {
         shifted |= 1;
     }
-    let flags = Flags::new().with(Flag::C, carry);
+    let flags = Flags::new()
+        .with(Flag::C, carry)
+        .with(Flag::Z, shifted == 0 && real_z);
     (shifted, flags)
 }
 
-const fn rrc(value: u8) -> (u8, Flags) {
+// Some variants of this instruction (rrca) always set Z to 0, but others actually compute the
+// result
+const fn rrc(value: u8, real_z: bool) -> (u8, Flags) {
     let carry = (value & 0x01) != 0;
     let mut shifted = value >> 1;
     if carry {
         shifted |= 0x80;
     }
-    let flags = Flags::new().with(Flag::C, carry);
+    let flags = Flags::new()
+        .with(Flag::C, carry)
+        .with(Flag::Z, shifted == 0 && real_z);
     (shifted, flags)
 }
 
-const fn rl(value: u8, old_carry: bool) -> (u8, Flags) {
+const fn rl(value: u8, old_carry: bool, real_z: bool) -> (u8, Flags) {
     let mut shifted = value << 1;
     if old_carry {
         shifted |= 0x01;
     }
     let new_carry = (value & 0x80) != 0;
-    let flags = Flags::new().with(Flag::C, new_carry);
+    let flags = Flags::new()
+        .with(Flag::C, new_carry)
+        .with(Flag::Z, shifted == 0 && real_z);
     (shifted, flags)
 }
 
-const fn rr(value: u8, old_carry: bool) -> (u8, Flags) {
+const fn rr(value: u8, old_carry: bool, real_z: bool) -> (u8, Flags) {
     let mut shifted = value >> 1;
     if old_carry {
         shifted |= 0x80;
     }
     let new_carry = (value & 0x01) != 0;
-    let flags = Flags::new().with(Flag::C, new_carry);
+    let flags = Flags::new()
+        .with(Flag::C, new_carry)
+        .with(Flag::Z, shifted == 0 && real_z);
     (shifted, flags)
 }
 
@@ -949,13 +965,14 @@ impl Cpu {
                 Cycles::new(8)
             }
             OpCode::IncReg(reg) => {
-                let val = self.get_reg(reg).wrapping_add(1);
-                self.set_reg(reg, val);
+                let prev = self.get_reg(reg);
+                let next = self.get_reg(reg).wrapping_add(1);
+                self.set_reg(reg, next);
                 self.set_flags(
                     self.get_flags()
-                        .with(Flag::Z, val == 0)
+                        .with(Flag::Z, next == 0)
                         .with(Flag::N, false)
-                        .with(Flag::H, val == 0x10),
+                        .with(Flag::H, carry_bit8(prev, 1, next, 4)),
                 );
                 Cycles::new(4)
             }
@@ -966,10 +983,9 @@ impl Cpu {
                 self.set_reg(reg, next);
                 self.set_flags(
                     self.get_flags()
-                        .with(Flag::Z, next == 0)
-                        .with(Flag::N, false)
-                        // FIXME: is this the correct behavior?
-                        .with(Flag::H, carry_bit8(minus_one, prev, next, 4)),
+                        .with(Flag::Z, next == 0u8)
+                        .with(Flag::N, true)
+                        .with(Flag::H, !carry_bit8(minus_one, prev, next, 4)),
                 );
                 Cycles::new(4)
             }
@@ -1028,12 +1044,22 @@ impl Cpu {
                 Cycles::new(4)
             }
             OpCode::Scf => {
-                self.set_flags(self.get_flags().with(Flag::C, true));
+                self.set_flags(
+                    self.get_flags()
+                        .with(Flag::C, true)
+                        .with(Flag::N, false)
+                        .with(Flag::H, false),
+                );
                 Cycles::new(4)
             }
             OpCode::Ccf => {
                 let flags = self.get_flags();
-                self.set_flags(flags.with(Flag::C, !flags.is_flag_set(Flag::C)));
+                self.set_flags(
+                    flags
+                        .with(Flag::C, !flags.is_flag_set(Flag::C))
+                        .with(Flag::N, false)
+                        .with(Flag::H, false),
+                );
                 Cycles::new(4)
             }
             OpCode::JrImm => {
@@ -1138,26 +1164,50 @@ impl Cpu {
                 self.get_mut_regs().irq_en = true;
                 Cycles::new(4)
             }
+            OpCode::Rlca => {
+                let (shifted, flags) = rlc(self.get_reg(Register::A), false);
+                self.set_reg(Register::A, shifted);
+                self.set_flags(flags);
+                Cycles::new(8)
+            }
+            OpCode::Rrca => {
+                let (shifted, flags) = rrc(self.get_reg(Register::A), false);
+                self.set_reg(Register::A, shifted);
+                self.set_flags(flags);
+                Cycles::new(8)
+            }
+            OpCode::Rla => {
+                let (shifted, flags) = rl(self.get_reg(Register::A), self.get_flag(Flag::C), false);
+                self.set_reg(Register::A, shifted);
+                self.set_flags(flags);
+                Cycles::new(8)
+            }
+            OpCode::Rra => {
+                let (shifted, flags) = rr(self.get_reg(Register::A), self.get_flag(Flag::C), false);
+                self.set_reg(Register::A, shifted);
+                self.set_flags(flags);
+                Cycles::new(8)
+            }
             OpCode::RlcReg(register) => {
-                let (shifted, flags) = rlc(self.get_reg(register));
+                let (shifted, flags) = rlc(self.get_reg(register), true);
                 self.set_reg(register, shifted);
                 self.set_flags(flags);
                 Cycles::new(8)
             }
             OpCode::RrcReg(register) => {
-                let (shifted, flags) = rrc(self.get_reg(register));
+                let (shifted, flags) = rrc(self.get_reg(register), true);
                 self.set_reg(register, shifted);
                 self.set_flags(flags);
                 Cycles::new(8)
             }
             OpCode::RlReg(register) => {
-                let (shifted, flags) = rl(self.get_reg(register), self.get_flag(Flag::C));
+                let (shifted, flags) = rl(self.get_reg(register), self.get_flag(Flag::C), true);
                 self.set_reg(register, shifted);
                 self.set_flags(flags);
                 Cycles::new(8)
             }
             OpCode::RrReg(register) => {
-                let (shifted, flags) = rr(self.get_reg(register), self.get_flag(Flag::C));
+                let (shifted, flags) = rr(self.get_reg(register), self.get_flag(Flag::C), true);
                 self.set_reg(register, shifted);
                 self.set_flags(flags);
                 Cycles::new(8)
@@ -1203,28 +1253,28 @@ impl Cpu {
             }
             OpCode::RlcHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rlc(memory.read(addr));
+                let (shifted, flags) = rlc(memory.read(addr), true);
                 memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::RrcHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rrc(memory.read(addr));
+                let (shifted, flags) = rrc(memory.read(addr), true);
                 memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::RlHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rl(memory.read(addr), self.get_flag(Flag::C));
+                let (shifted, flags) = rl(memory.read(addr), self.get_flag(Flag::C), true);
                 memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
             }
             OpCode::RrHlInd => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rr(memory.read(addr), self.get_flag(Flag::C));
+                let (shifted, flags) = rr(memory.read(addr), self.get_flag(Flag::C), true);
                 memory.write(addr, shifted);
                 self.set_flags(flags);
                 Cycles::new(16)
