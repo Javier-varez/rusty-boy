@@ -1003,14 +1003,14 @@ impl Cpu {
             }
             OpCode::IncIndHl => {
                 let addr = self.get_reg_pair(RegisterPair::HL);
-                let val = memory.read(addr);
-                let val = val.wrapping_add(1);
-                memory.write(addr, val);
+                let prev = memory.read(addr);
+                let next = prev.wrapping_add(1);
+                memory.write(addr, next);
                 self.set_flags(
                     self.get_flags()
-                        .with(Flag::Z, val == 0)
+                        .with(Flag::Z, next == 0)
                         .with(Flag::N, false)
-                        .with(Flag::H, val == 0x10),
+                        .with(Flag::H, carry_bit8(prev, 1, next, 4)),
                 );
                 Cycles::new(12)
             }
@@ -1022,10 +1022,9 @@ impl Cpu {
                 memory.write(addr, next);
                 self.set_flags(
                     self.get_flags()
-                        .with(Flag::Z, next == 0)
-                        .with(Flag::N, false)
-                        // FIXME: is this the correct behavior?
-                        .with(Flag::H, carry_bit8(minus_one, prev, next, 4)),
+                        .with(Flag::Z, next == 0u8)
+                        .with(Flag::N, true)
+                        .with(Flag::H, !carry_bit8(minus_one, prev, next, 4)),
                 );
                 Cycles::new(12)
             }
