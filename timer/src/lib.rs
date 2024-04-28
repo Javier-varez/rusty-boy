@@ -75,10 +75,11 @@ impl Timer {
         debug_assert!(cycles <= <u16 as Into<usize>>::into(u16::max_value()));
 
         let prev_div = self.div;
-        let cur_div = if self.request_div_reset {
-            0
+        let (cur_div, div_overflow) = if self.request_div_reset {
+            self.request_div_reset = false;
+            (0, true)
         } else {
-            prev_div.wrapping_add(cycles as u16)
+            prev_div.overflowing_add(cycles as u16)
         };
         self.div = cur_div;
 
@@ -91,14 +92,19 @@ impl Timer {
             return Interrupts::new();
         }
 
-        let bit_mask = !((1 << self.clk_select_bit()) - 1);
-        if ((prev_div ^ cur_div) & bit_mask) == 0 {
-            // No increment of TIMA required
-            return Interrupts::new();
-        }
+        let clk_sel_bit = self.clk_select_bit();
+        let shifted_cur_div = cur_div >> clk_sel_bit;
+        let shifted_prev_div = prev_div >> clk_sel_bit;
+        let wraparound_val = ((1 << 16) >> clk_sel_bit) as u16;
+        let new_count = if div_overflow {
+            wraparound_val + shifted_cur_div - shifted_prev_div
+        } else {
+            shifted_cur_div - shifted_prev_div
+        };
 
-        self.tima = self.tima.wrapping_add(1);
-        if self.tima == 0x0 {
+        let (new_tima, did_tima_overflow) = self.tima.overflowing_add(new_count as u8);
+        self.tima = new_tima;
+        if did_tima_overflow {
             Interrupt::Timer.into()
         } else {
             Interrupts::new()
