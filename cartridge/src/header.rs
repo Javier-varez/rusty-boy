@@ -52,7 +52,7 @@ impl From<u8> for RamSize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum CartridgeType {
     RomOnly,
     Mbc1,
