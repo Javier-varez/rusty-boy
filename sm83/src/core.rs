@@ -1167,25 +1167,25 @@ impl Cpu {
                 let (shifted, flags) = rlc(self.get_reg(Register::A), false);
                 self.set_reg(Register::A, shifted);
                 self.set_flags(flags);
-                Cycles::new(8)
+                Cycles::new(4)
             }
             OpCode::Rrca => {
                 let (shifted, flags) = rrc(self.get_reg(Register::A), false);
                 self.set_reg(Register::A, shifted);
                 self.set_flags(flags);
-                Cycles::new(8)
+                Cycles::new(4)
             }
             OpCode::Rla => {
                 let (shifted, flags) = rl(self.get_reg(Register::A), self.get_flag(Flag::C), false);
                 self.set_reg(Register::A, shifted);
                 self.set_flags(flags);
-                Cycles::new(8)
+                Cycles::new(4)
             }
             OpCode::Rra => {
                 let (shifted, flags) = rr(self.get_reg(Register::A), self.get_flag(Flag::C), false);
                 self.set_reg(Register::A, shifted);
                 self.set_flags(flags);
-                Cycles::new(8)
+                Cycles::new(4)
             }
             OpCode::RlcReg(register) => {
                 let (shifted, flags) = rlc(self.get_reg(register), true);
