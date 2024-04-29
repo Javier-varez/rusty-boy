@@ -79,4 +79,8 @@ impl<'a> RustyBoy<'a> {
         while PpuResult::FrameComplete != self.step() {}
         Ok(self.address_space.ppu.frame())
     }
+
+    pub fn update_keys(&mut self, state: &joypad::State) {
+        self.address_space.joypad.update_buttons(state);
+    }
 }

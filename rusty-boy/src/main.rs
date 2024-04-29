@@ -140,6 +140,8 @@ fn main() -> anyhow::Result<()> {
 
     let mut frame_id = 0;
 
+    let mut joypad = rusty_boy::joypad::State::new();
+
     let mut next_deadline = Instant::now();
     let mut start = Instant::now();
     let mut load = Duration::from_millis(0);
@@ -151,9 +153,40 @@ fn main() -> anyhow::Result<()> {
                     keycode: Some(sdl2::keyboard::Keycode::Escape),
                     ..
                 } => break 'running,
+
+                sdl2::event::Event::KeyDown {
+                    keycode: Some(key), ..
+                } => match key {
+                    sdl2::keyboard::Keycode::W => joypad.up = true,
+                    sdl2::keyboard::Keycode::S => joypad.down = true,
+                    sdl2::keyboard::Keycode::D => joypad.right = true,
+                    sdl2::keyboard::Keycode::A => joypad.left = true,
+                    sdl2::keyboard::Keycode::J => joypad.a = true,
+                    sdl2::keyboard::Keycode::K => joypad.b = true,
+                    sdl2::keyboard::Keycode::Semicolon => joypad.start = true,
+                    sdl2::keyboard::Keycode::Space => joypad.select = true,
+                    _ => {}
+                },
+
+                sdl2::event::Event::KeyUp {
+                    keycode: Some(key), ..
+                } => match key {
+                    sdl2::keyboard::Keycode::W => joypad.up = false,
+                    sdl2::keyboard::Keycode::S => joypad.down = false,
+                    sdl2::keyboard::Keycode::D => joypad.right = false,
+                    sdl2::keyboard::Keycode::A => joypad.left = false,
+                    sdl2::keyboard::Keycode::J => joypad.a = false,
+                    sdl2::keyboard::Keycode::K => joypad.b = false,
+                    sdl2::keyboard::Keycode::Semicolon => joypad.start = false,
+                    sdl2::keyboard::Keycode::Space => joypad.select = false,
+                    _ => {}
+                },
+
                 _ => {}
             }
         }
+
+        rusty_boy.update_keys(&joypad);
 
         let frame = {
             let frame_start = Instant::now();
