@@ -30,7 +30,7 @@ impl DmaEngine {
         const NO_CYCLES: Cycles = Cycles::new(0);
         while cycles != NO_CYCLES && self.active {
             let src_address = self.base_address + self.current_element;
-            let dest_address = 0xFF00 + self.current_element;
+            let dest_address = 0xFE00 + self.current_element;
             let value = memory.read(src_address);
             memory.write(dest_address, value);
             cycles = cycles - Cycles::new(4);
