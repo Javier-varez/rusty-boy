@@ -54,6 +54,10 @@ impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
                 log::trace!("Unimplemented read from I/O regs: {address:#x}");
                 0
             }
+            0xFEA0..=0xFEFF => {
+                // This region must not be used, but unfortunately some games seem to rely on it.
+                0
+            }
             _ => panic!("Invalid read address: {}", address),
         }
     }
@@ -82,6 +86,9 @@ impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
             0xFF0F | 0xFFFF => self.interrupt_regs.write(address, value),
             0xFF00..=0xFF3F | 0xFF4C..=0xFF7F => {
                 log::trace!("Unimplemented write to I/O regs: {address:#x} = {value:#x}")
+            }
+            0xFEA0..=0xFEFF => {
+                // This region must not be used, but unfortunately some games seem to rely on it.
             }
             _ => panic!("Invalid write address: {address:#x}, value {value:#x}"),
         }
