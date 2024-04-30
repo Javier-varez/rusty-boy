@@ -10,8 +10,6 @@ const RAM_BASE: usize = 0xA000;
 const RAM_BANK_SIZE: usize = 4 * 1024;
 const RAM_BANK_SELECT_MASK: usize = 0x0f;
 
-const BANK_MODE_SELECT_MASK: usize = 0x01;
-
 pub struct Mbc3<'a> {
     ram: Vec<u8>,
     rom: &'a [u8],
