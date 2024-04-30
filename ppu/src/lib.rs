@@ -16,7 +16,7 @@ use tock_registers::interfaces::{ReadWriteable, Readable};
 use vram::Vram;
 
 use regs::STAT;
-use vram::TILE_WIDTH;
+use vram::{TILE_HEIGHT, TILE_WIDTH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Color {
@@ -289,16 +289,31 @@ impl Ppu {
             // either a selected (color, and x coordinate) or nothing
             let mut line: [Option<(usize, Color)>; DISPLAY_WIDTH] = [None; DISPLAY_WIDTH];
 
-            // TODO: handle priorities properly
+            // TODO: handle 16x objects
+            assert_eq!(
+                self.regs
+                    .lcdc
+                    .read_as_enum::<regs::LCDC::OBJ_SIZE::Value>(regs::LCDC::OBJ_SIZE)
+                    .unwrap(),
+                regs::LCDC::OBJ_SIZE::Value::Tile8x8
+            );
+
             for (obj_prio, object) in self
                 .selected_oam_entries
                 .iter()
                 .map(|i| &self.oam.objects()[*i])
                 .enumerate()
             {
-                let tile_line = OBJ_OFFSET_Y + line_idx - object.y as usize;
+                let y_flip = object.attrs.read(oam::OBJ_ATTRS::Y_FLIP) != 0;
+                let x_flip = object.attrs.read(oam::OBJ_ATTRS::X_FLIP) != 0;
+
+                let y = if y_flip {
+                    TILE_HEIGHT - 1 - object.y as usize
+                } else {
+                    object.y as usize
+                };
+                let tile_line = OBJ_OFFSET_Y + line_idx - y as usize;
                 assert!(tile_line < OBJ_OFFSET_Y);
-                // TODO: handle y flip
 
                 let palette = match object
                     .attrs
@@ -321,10 +336,9 @@ impl Ppu {
                         // Transparent
                         continue;
                     }
-                    let bit_color = bg_palette.color(pixel);
+                    let bit_color = palette.color(pixel);
 
-                    // TODO: handle x flip
-                    let x = i + object.x as usize;
+                    let x = if x_flip { OBJ_OFFSET_X - 1 - i } else { i } + object.x as usize;
                     if x < OBJ_OFFSET_X || x >= DISPLAY_WIDTH + OBJ_OFFSET_X {
                         continue;
                     }
