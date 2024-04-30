@@ -11,7 +11,7 @@ register_bitfields! [
     u8,
 
     /// Attributes of an 8x8 or 8x16 object
-    OBJ_ATTRS [
+    pub OBJ_ATTRS [
         /// Determines whether the background and window color indexes 1-3 are drawn over this
         /// object
         PRIO OFFSET(7) NUMBITS(1) [
@@ -31,8 +31,8 @@ register_bitfields! [
             Yes = 1,
         ],
 
-        /// Determines whether the object is drawn normally or flipped around the X axis
-        PALETTE OFFSET(4) NUMBITS(1) [
+        /// Determines which palette must be used to draw the object
+        PALETTE_SELECTOR OFFSET(4) NUMBITS(1) [
             Palette0 = 0,
             Palette1 = 1,
         ],
@@ -40,11 +40,11 @@ register_bitfields! [
 ];
 
 #[repr(C)]
-struct Object {
-    y: u8,
-    x: u8,
-    tile_idx: TileIndex,
-    attrs: InMemoryRegister<u8, OBJ_ATTRS::Register>,
+pub struct Object {
+    pub(crate) y: u8,
+    pub(crate) x: u8,
+    pub(crate) tile_idx: TileIndex,
+    pub(crate) attrs: InMemoryRegister<u8, OBJ_ATTRS::Register>,
 }
 
 const OBJECT_SIZE: usize = 4;
@@ -111,6 +111,14 @@ impl Oam {
     const fn cpu_addr_to_object_addr(address: sm83::memory::Address) -> (usize, usize) {
         let address = address as usize - Self::OAM_BASE;
         (address / OBJECT_SIZE, address % OBJECT_SIZE)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Object> {
+        self.objects.iter()
+    }
+
+    pub fn objects(&self) -> &[Object] {
+        &self.objects
     }
 }
 

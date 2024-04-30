@@ -86,6 +86,9 @@ pub struct Ppu {
     cycles: Cycles,
     stat_irq: bool,
 
+    // Vector of indexes into OAM entries
+    selected_oam_entries: Vec<usize>,
+
     /// Origin of coordinates is top-left pixel.
     framebuffer: Frame,
 }
@@ -96,6 +99,9 @@ const OAM_SCAN_LEN: usize = 80;
 const DRAWING_PIXELS_LEN: usize = 172;
 const HBLANK_LEN: usize = 204;
 const LINE_LENGTH: usize = OAM_SCAN_LEN + DRAWING_PIXELS_LEN + HBLANK_LEN;
+const MAX_SELECTED_OBJECTS: usize = 10;
+const OBJ_OFFSET_Y: usize = 16;
+const OBJ_OFFSET_X: usize = 8;
 
 static_assertions::const_assert_eq!(CYCLES_PER_FRAME, LINE_LENGTH * 154);
 
@@ -123,7 +129,7 @@ fn mode_for_current_cycle_count(cycles: Cycles) -> Mode {
 
 impl Ppu {
     /// Constructs a PPU instance
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             vram: Vram::new(),
             regs: Registers::new(),
@@ -132,6 +138,7 @@ impl Ppu {
             mode: Mode::OamScan,
             cycles: Cycles::new(0),
             stat_irq: false,
+            selected_oam_entries: Vec::with_capacity(MAX_SELECTED_OBJECTS),
             framebuffer: [[Color::White; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
         }
     }
@@ -182,6 +189,27 @@ impl Ppu {
         Interrupts::new()
     }
 
+    fn oam_scan(&mut self, line: usize) {
+        self.selected_oam_entries.shrink_to(0);
+
+        let obj_height = (self.regs.lcdc.read(regs::LCDC::OBJ_SIZE) + 1) * 8;
+
+        let cur_obj_line = (line + OBJ_OFFSET_Y) as u8;
+        let is_object_relevant = |(_, object): &(usize, &oam::Object)| -> bool {
+            cur_obj_line >= object.y && cur_obj_line < object.y + obj_height
+        };
+
+        // Walk all entries from 0 to NUM_OBJS
+        self.selected_oam_entries = self
+            .oam
+            .iter()
+            .enumerate()
+            .filter(is_object_relevant)
+            .map(|(i, _)| i)
+            .take(MAX_SELECTED_OBJECTS)
+            .collect();
+    }
+
     fn step_inner(&mut self, new_mode: Mode, line: usize) -> (Interrupts, PpuResult) {
         const NO_IRQ: Interrupts = Interrupts::new();
         if self.mode == new_mode {
@@ -193,17 +221,13 @@ impl Ppu {
 
         match self.mode {
             Mode::OamScan => {
-                // TODO: Do OAM scan
+                self.oam_scan(line);
             }
-            Mode::Hblank => {
-                // Nothing to do
-            }
+            Mode::Hblank => {}
             Mode::DrawingPixels => {
-                // Fill in current line in framebuffer
                 self.draw_line(line);
             }
             Mode::Vblank => {
-                // Frame is complete
                 self.update_registers(line);
                 return (Interrupt::Vblank.into(), PpuResult::FrameComplete);
             }
@@ -220,7 +244,7 @@ impl Ppu {
 
         let bg_y_offset = self.regs.scy as usize;
         let bg_x_offset = self.regs.scx as usize;
-        let palette = self.regs.bg_palette;
+        let bg_palette = self.regs.bg_palette;
 
         let bg_tile_map: crate::regs::LCDC::BG_TILE_MAP::Value = self
             .regs
@@ -251,7 +275,7 @@ impl Ppu {
             let tile_line_idx = (bg_y_offset + line_idx) % vram::TILE_HEIGHT;
             let tile_line = tile.get_line(tile_line_idx);
             for pixel in tile_line.iter().skip(x_inner_offset) {
-                let bit_color = palette.color(pixel);
+                let bit_color = bg_palette.color(pixel);
                 self.framebuffer[line_idx][disp_x_offset] = bit_color;
                 disp_x_offset += 1;
                 if disp_x_offset >= DISPLAY_WIDTH {
@@ -259,6 +283,73 @@ impl Ppu {
                 }
             }
             x_inner_offset = 0;
+        }
+
+        if self.regs.lcdc.read(regs::LCDC::OBJ_ENABLE) == 1 {
+            // either a selected (color, and x coordinate) or nothing
+            let mut line: [Option<(usize, Color)>; DISPLAY_WIDTH] = [None; DISPLAY_WIDTH];
+
+            // TODO: handle priorities properly
+            for (obj_prio, object) in self
+                .selected_oam_entries
+                .iter()
+                .map(|i| &self.oam.objects()[*i])
+                .enumerate()
+            {
+                let tile_line = OBJ_OFFSET_Y + line_idx - object.y as usize;
+                assert!(tile_line < OBJ_OFFSET_Y);
+                // TODO: handle y flip
+
+                let palette = match object
+                    .attrs
+                    .read_as_enum(oam::OBJ_ATTRS::PALETTE_SELECTOR)
+                    .unwrap()
+                {
+                    oam::OBJ_ATTRS::PALETTE_SELECTOR::Value::Palette0 => self.regs.obj_palette0,
+                    oam::OBJ_ATTRS::PALETTE_SELECTOR::Value::Palette1 => self.regs.obj_palette1,
+                };
+
+                let tile = self.vram.get_tile(
+                    object.tile_idx,
+                    regs::LCDC::BG_AND_WINDOW_TILE_DATA::Value::Blocks0And1,
+                );
+
+                let tile_line = tile.get_line(tile_line);
+
+                for (i, pixel) in tile_line.iter().enumerate() {
+                    if pixel == PaletteIndex::Id0 {
+                        // Transparent
+                        continue;
+                    }
+                    let bit_color = bg_palette.color(pixel);
+
+                    // TODO: handle x flip
+                    let x = i + object.x as usize;
+                    if x < OBJ_OFFSET_X || x >= DISPLAY_WIDTH + OBJ_OFFSET_X {
+                        continue;
+                    }
+                    let x = x - OBJ_OFFSET_X;
+
+                    line[x] = Some(match line[x] {
+                        None => (obj_prio, bit_color),
+                        Some((prio, _)) if prio > obj_prio => (obj_prio, bit_color),
+                        Some(v) => v,
+                    });
+                }
+            }
+
+            for (x, pix) in line.iter().enumerate() {
+                match pix {
+                    None => {}
+                    Some((_, c)) => {
+                        self.framebuffer[line_idx][x] = *c;
+                    }
+                }
+            }
+        }
+
+        if self.regs.lcdc.read(regs::LCDC::WINDOW_ENABLE) == 1 {
+            // TODO: handle window
         }
     }
 
