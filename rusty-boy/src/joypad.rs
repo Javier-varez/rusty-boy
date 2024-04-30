@@ -20,7 +20,7 @@ impl Joypad {
     pub fn update_buttons(&mut self, state: &State) {
         let to_bit = |val: bool, bit: usize| -> u8 {
             if val {
-                (1 << bit) & 0xf
+                !(1 << bit) & 0xf
             } else {
                 0x0f
             }

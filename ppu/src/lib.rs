@@ -307,13 +307,13 @@ impl Ppu {
                 let y_flip = object.attrs.read(oam::OBJ_ATTRS::Y_FLIP) != 0;
                 let x_flip = object.attrs.read(oam::OBJ_ATTRS::X_FLIP) != 0;
 
-                let y = if y_flip {
-                    TILE_HEIGHT - 1 - object.y as usize
-                } else {
-                    object.y as usize
-                };
-                let tile_line = OBJ_OFFSET_Y + line_idx - y as usize;
+                let tile_line = OBJ_OFFSET_Y + line_idx - object.y as usize;
                 assert!(tile_line < OBJ_OFFSET_Y);
+                let tile_line = if y_flip {
+                    TILE_HEIGHT - 1 - tile_line
+                } else {
+                    tile_line
+                };
 
                 let palette = match object
                     .attrs
