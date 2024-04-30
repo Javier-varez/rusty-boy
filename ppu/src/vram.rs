@@ -167,6 +167,9 @@ impl TileIndex {
     pub const fn new(index: u8) -> Self {
         Self(index)
     }
+    pub fn next(self) -> Self {
+        Self(self.0 + 1)
+    }
 }
 
 impl From<u8> for TileIndex {
@@ -255,10 +258,20 @@ impl Vram {
         (tile_map_idx, tile_map_address)
     }
 
-    pub(crate) fn get_tile_map(&self, map: crate::regs::LCDC::BG_TILE_MAP::Value) -> &TileMap {
+    pub(crate) fn get_bg_tile_map(&self, map: crate::regs::LCDC::BG_TILE_MAP::Value) -> &TileMap {
         match map {
             crate::regs::LCDC::BG_TILE_MAP::Value::HighMap => &self.tile_maps[1],
             crate::regs::LCDC::BG_TILE_MAP::Value::LowMap => &self.tile_maps[0],
+        }
+    }
+
+    pub(crate) fn get_win_tile_map(
+        &self,
+        map: crate::regs::LCDC::WINDOW_TILE_MAP::Value,
+    ) -> &TileMap {
+        match map {
+            crate::regs::LCDC::WINDOW_TILE_MAP::Value::HighMap => &self.tile_maps[1],
+            crate::regs::LCDC::WINDOW_TILE_MAP::Value::LowMap => &self.tile_maps[0],
         }
     }
 

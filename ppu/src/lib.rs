@@ -237,8 +237,13 @@ impl Ppu {
         (NO_IRQ, PpuResult::InProgress(self.mode))
     }
 
-    fn draw_line(&mut self, line_idx: usize) {
-        if self.regs.lcdc.read(regs::LCDC::ENABLE) == 0 {
+    fn draw_line_background(&mut self, line_idx: usize) {
+        let bg_win_enable = self.regs.lcdc.read(regs::LCDC::BG_AND_WINDOW_ENABLE) != 0;
+        if !bg_win_enable {
+            // BG is disabled
+            for c in &mut self.framebuffer[line_idx] {
+                *c = Color::White;
+            }
             return;
         }
 
@@ -265,7 +270,7 @@ impl Ppu {
 
         'outer: for tile_index in self
             .vram
-            .get_tile_map(bg_tile_map)
+            .get_bg_tile_map(bg_tile_map)
             .line(bg_y_offset + line_idx)
             .iter()
             .cycle()
@@ -284,86 +289,151 @@ impl Ppu {
             }
             x_inner_offset = 0;
         }
+    }
 
-        if self.regs.lcdc.read(regs::LCDC::OBJ_ENABLE) == 1 {
-            // either a selected (color, and x coordinate) or nothing
-            let mut line: [Option<(usize, Color)>; DISPLAY_WIDTH] = [None; DISPLAY_WIDTH];
+    fn draw_line_window(&mut self, line_idx: usize) {
+        let bg_win_enable = self.regs.lcdc.read(regs::LCDC::BG_AND_WINDOW_ENABLE) != 0;
+        if !bg_win_enable {
+            return;
+        }
 
-            // TODO: handle 16x objects
-            assert_eq!(
-                self.regs
-                    .lcdc
-                    .read_as_enum::<regs::LCDC::OBJ_SIZE::Value>(regs::LCDC::OBJ_SIZE)
-                    .unwrap(),
-                regs::LCDC::OBJ_SIZE::Value::Tile8x8
-            );
+        let wy = self.regs.wy as usize;
+        if line_idx < wy {
+            // Nothing to draw, return
+            return;
+        }
+        let win_line = line_idx - wy;
 
-            for (obj_prio, object) in self
-                .selected_oam_entries
-                .iter()
-                .map(|i| &self.oam.objects()[*i])
-                .enumerate()
-            {
-                let y_flip = object.attrs.read(oam::OBJ_ATTRS::Y_FLIP) != 0;
-                let x_flip = object.attrs.read(oam::OBJ_ATTRS::X_FLIP) != 0;
+        let win_palette = self.regs.bg_palette;
 
-                let tile_line = OBJ_OFFSET_Y + line_idx - object.y as usize;
-                assert!(tile_line < OBJ_OFFSET_Y);
-                let tile_line = if y_flip {
-                    TILE_HEIGHT - 1 - tile_line
-                } else {
-                    tile_line
-                };
+        let win_tile_map: crate::regs::LCDC::WINDOW_TILE_MAP::Value = self
+            .regs
+            .lcdc
+            .read_as_enum(crate::regs::LCDC::WINDOW_TILE_MAP)
+            .expect("Invalid LCDC bit 6");
 
-                let palette = match object
-                    .attrs
-                    .read_as_enum(oam::OBJ_ATTRS::PALETTE_SELECTOR)
-                    .unwrap()
-                {
-                    oam::OBJ_ATTRS::PALETTE_SELECTOR::Value::Palette0 => self.regs.obj_palette0,
-                    oam::OBJ_ATTRS::PALETTE_SELECTOR::Value::Palette1 => self.regs.obj_palette1,
-                };
+        let win_tile_data_area: crate::regs::LCDC::BG_AND_WINDOW_TILE_DATA::Value = self
+            .regs
+            .lcdc
+            .read_as_enum(crate::regs::LCDC::BG_AND_WINDOW_TILE_DATA)
+            .expect("Invalid LCDC bit 4");
 
-                let tile = self.vram.get_tile(
-                    object.tile_idx,
-                    regs::LCDC::BG_AND_WINDOW_TILE_DATA::Value::Blocks0And1,
-                );
+        const WX_OFFSET: usize = 7;
+        let wx = self.regs.wx as usize;
+        let mut disp_x_offset = if wx >= WX_OFFSET { wx - WX_OFFSET } else { 0 };
+        let mut disp_x_initial_skip = if wx >= WX_OFFSET { 0 } else { WX_OFFSET - wx };
+        if disp_x_offset >= DISPLAY_WIDTH {
+            return;
+        }
 
-                let tile_line = tile.get_line(tile_line);
-
-                for (i, pixel) in tile_line.iter().enumerate() {
-                    if pixel == PaletteIndex::Id0 {
-                        // Transparent
-                        continue;
-                    }
-                    let bit_color = palette.color(pixel);
-
-                    let x = if x_flip { OBJ_OFFSET_X - 1 - i } else { i } + object.x as usize;
-                    if x < OBJ_OFFSET_X || x >= DISPLAY_WIDTH + OBJ_OFFSET_X {
-                        continue;
-                    }
-                    let x = x - OBJ_OFFSET_X;
-
-                    line[x] = Some(match line[x] {
-                        None => (obj_prio, bit_color),
-                        Some((prio, _)) if prio > obj_prio => (obj_prio, bit_color),
-                        Some(v) => v,
-                    });
+        'outer: for tile_index in self
+            .vram
+            .get_win_tile_map(win_tile_map)
+            .line(win_line)
+            .iter()
+        {
+            let tile = self.vram.get_tile(*tile_index, win_tile_data_area);
+            let tile_line_idx = win_line % vram::TILE_HEIGHT;
+            let tile_line = tile.get_line(tile_line_idx);
+            for pixel in tile_line.iter().skip(disp_x_initial_skip) {
+                let bit_color = win_palette.color(pixel);
+                self.framebuffer[line_idx][disp_x_offset] = bit_color;
+                disp_x_offset += 1;
+                if disp_x_offset >= DISPLAY_WIDTH {
+                    break 'outer;
                 }
             }
+            disp_x_initial_skip = 0;
+        }
+    }
 
-            for (x, pix) in line.iter().enumerate() {
-                match pix {
-                    None => {}
-                    Some((_, c)) => {
-                        self.framebuffer[line_idx][x] = *c;
-                    }
+    fn draw_line_objects(&mut self, line_idx: usize) {
+        // either a selected (color, and x coordinate) or nothing
+        let mut line: [Option<(usize, Color)>; DISPLAY_WIDTH] = [None; DISPLAY_WIDTH];
+
+        for (obj_prio, object) in self
+            .selected_oam_entries
+            .iter()
+            .map(|i| &self.oam.objects()[*i])
+            .enumerate()
+        {
+            let y_flip = object.attrs.read(oam::OBJ_ATTRS::Y_FLIP) != 0;
+            let x_flip = object.attrs.read(oam::OBJ_ATTRS::X_FLIP) != 0;
+
+            let tile_line = OBJ_OFFSET_Y + line_idx - object.y as usize;
+            let (tile_idx, tile_line) = if tile_line >= TILE_HEIGHT {
+                (object.tile_idx.next(), tile_line - TILE_HEIGHT)
+            } else {
+                (object.tile_idx, tile_line)
+            };
+
+            assert!(tile_line < TILE_HEIGHT);
+            let tile_line = if y_flip {
+                TILE_HEIGHT - 1 - tile_line
+            } else {
+                tile_line
+            };
+
+            let palette = match object
+                .attrs
+                .read_as_enum(oam::OBJ_ATTRS::PALETTE_SELECTOR)
+                .unwrap()
+            {
+                oam::OBJ_ATTRS::PALETTE_SELECTOR::Value::Palette0 => self.regs.obj_palette0,
+                oam::OBJ_ATTRS::PALETTE_SELECTOR::Value::Palette1 => self.regs.obj_palette1,
+            };
+
+            let tile = self.vram.get_tile(
+                tile_idx,
+                regs::LCDC::BG_AND_WINDOW_TILE_DATA::Value::Blocks0And1,
+            );
+
+            let tile_line = tile.get_line(tile_line);
+
+            for (i, pixel) in tile_line.iter().enumerate() {
+                if pixel == PaletteIndex::Id0 {
+                    // Transparent
+                    continue;
                 }
+                let bit_color = palette.color(pixel);
+
+                let x = if x_flip { OBJ_OFFSET_X - 1 - i } else { i } + object.x as usize;
+                if x < OBJ_OFFSET_X || x >= DISPLAY_WIDTH + OBJ_OFFSET_X {
+                    continue;
+                }
+                let x = x - OBJ_OFFSET_X;
+
+                line[x] = Some(match line[x] {
+                    None => (obj_prio, bit_color),
+                    Some((prio, _)) if prio > obj_prio => (obj_prio, bit_color),
+                    Some(v) => v,
+                });
             }
         }
 
+        for (x, pix) in line.iter().enumerate() {
+            match pix {
+                None => {}
+                Some((_, c)) => {
+                    self.framebuffer[line_idx][x] = *c;
+                }
+            }
+        }
+    }
+
+    fn draw_line(&mut self, line_idx: usize) {
+        if self.regs.lcdc.read(regs::LCDC::ENABLE) == 0 {
+            return;
+        }
+
+        self.draw_line_background(line_idx);
+
         if self.regs.lcdc.read(regs::LCDC::WINDOW_ENABLE) == 1 {
-            // TODO: handle window
+            self.draw_line_window(line_idx);
+        }
+
+        if self.regs.lcdc.read(regs::LCDC::OBJ_ENABLE) == 1 {
+            self.draw_line_objects(line_idx);
         }
     }
 

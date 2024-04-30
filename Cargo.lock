@@ -296,6 +296,7 @@ dependencies = [
 name = "ppu"
 version = "0.1.0"
 dependencies = [
+ "log",
  "sm83",
  "static_assertions",
  "tock-registers",
