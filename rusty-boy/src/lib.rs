@@ -18,18 +18,18 @@ pub struct RustyBoy<'a> {
 }
 
 impl<'a> RustyBoy<'a> {
-    pub fn new_with_cartridge(cartridge: Cartridge<'a>) -> anyhow::Result<Self> {
+    pub fn new_with_cartridge(cartridge: Cartridge<'a>) -> Self {
         const ENTRYPOINT: u16 = 0x100;
 
         let mut cpu = Cpu::new();
         cpu.get_mut_regs().pc_reg = ENTRYPOINT;
 
-        Ok(Self {
+        Self {
             debug: false,
             cpu,
             dma_engine: DmaEngine::new(),
             address_space: GbAddressSpace::new(cartridge),
-        })
+        }
     }
 
     pub fn enable_debug(&mut self) {
@@ -89,11 +89,9 @@ impl<'a> RustyBoy<'a> {
         ppu_result
     }
 
-    pub fn run_until_next_frame(
-        &mut self,
-    ) -> anyhow::Result<&[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]> {
+    pub fn run_until_next_frame(&mut self) -> &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT] {
         while PpuResult::FrameComplete != self.step() {}
-        Ok(self.address_space.ppu.frame())
+        self.address_space.ppu.frame()
     }
 
     pub fn update_keys(&mut self, state: &joypad::State) {

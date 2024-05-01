@@ -2,10 +2,12 @@
 
 extern crate alloc;
 
+use cartridge::Cartridge;
 use crankstart::log_to_console;
 use crankstart_sys::PDButtons;
+use rusty_boy::RustyBoy;
 use {
-    alloc::boxed::Box,
+    alloc::{boxed::Box, vec},
     anyhow::Error,
     crankstart::{
         crankstart_game,
@@ -18,22 +20,39 @@ use {
     euclid::{point2, vec2},
 };
 
-struct State {
+struct State<'a> {
+    rusty_boy: Box<RustyBoy<'a>>,
     location: ScreenPoint,
     velocity: ScreenVector,
 }
 
-impl State {
+impl<'a> State<'a> {
     pub fn new(_playdate: &Playdate) -> Result<Box<Self>, Error> {
         crankstart::display::Display::get().set_refresh_rate(20.0)?;
+        let fs = crankstart::file::FileSystem::get();
+        let file = fs.open("readme.txt", crankstart_sys::FileOptions::kFileWrite)?;
+        file.write("Put roms here".as_bytes())?;
+        drop(file);
+
+        let file = fs.open("pokemon.gb", crankstart_sys::FileOptions::kFileReadData)?;
+        file.seek(0, crankstart::file::Whence::End)?;
+        let size = file.tell()? as usize;
+        log_to_console!("file size is {size} bytes");
+        file.seek(0, crankstart::file::Whence::Set)?;
+        let rom = Box::leak(Box::new(vec![0u8; size]));
+        file.read(rom)?;
+        log_to_console!("File is in ram");
+        let cartridge = Cartridge::new(rom).map_err(|e| anyhow::format_err!("{e:?}"))?;
+
         Ok(Box::new(Self {
             location: point2(INITIAL_X, INITIAL_Y),
             velocity: vec2(1, 2),
+            rusty_boy: Box::new(RustyBoy::new_with_cartridge(cartridge)),
         }))
     }
 }
 
-impl Game for State {
+impl<'a> Game for State<'a> {
     fn update(&mut self, _playdate: &mut Playdate) -> Result<(), Error> {
         let graphics = Graphics::get();
         graphics.clear_context()?;
@@ -55,8 +74,9 @@ impl Game for State {
             log_to_console!("Button A pushed");
         }
 
-        System::get().draw_fps(0, 0)?;
+        self.rusty_boy.run_until_next_frame();
 
+        System::get().draw_fps(0, 0)?;
         Ok(())
     }
 }

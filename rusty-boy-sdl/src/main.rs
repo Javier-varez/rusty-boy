@@ -137,7 +137,7 @@ fn main() -> anyhow::Result<()> {
     let rom_data = std::fs::read(&args.rom_path)?;
     let cartridge =
         Cartridge::new(&rom_data).map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?;
-    let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge)?;
+    let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge);
 
     if rusty_boy.supports_battery_backed_ram() {
         attempt_restore_save_file(&mut rusty_boy, &args.rom_path)?;
@@ -218,7 +218,7 @@ fn main() -> anyhow::Result<()> {
 
         let frame = {
             let frame_start = Instant::now();
-            let frame = rusty_boy.run_until_next_frame().unwrap();
+            let frame = rusty_boy.run_until_next_frame();
             let frame_end = Instant::now();
             load += frame_end - frame_start;
             frame

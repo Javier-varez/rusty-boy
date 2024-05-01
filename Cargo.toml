@@ -7,7 +7,7 @@ members = [
     "sm83",
     "sm83_decoder_macros",
     "cartridge",
-    "timer",
+    "timer", "rusty-boy-sdl", "rb-disasm",
 ]
 
 exclude = [

@@ -17,7 +17,9 @@ fn main() -> anyhow::Result<()> {
     let data = std::fs::read(args.rom_path)?;
     let disassembler = Disassembler::new(&data);
 
-    let header = disassembler.header()?;
+    let header = disassembler
+        .header()
+        .map_err(|e| anyhow::format_err!("{e:?}"))?;
     println!("Rom Header:");
     println!("\tTitle: \"{}\"", header.title);
     println!("\tManufacturer code: {:?}", header.manufacturer_code);
@@ -27,11 +29,17 @@ fn main() -> anyhow::Result<()> {
     println!("\tRAM size: {}", header.ram_size);
     println!("\tType: {}", header.cartridge_type);
     println!("\tEntrypoint:");
-    for (addr, insn) in disassembler.entrypoint()? {
+    for (addr, insn) in disassembler
+        .entrypoint()
+        .map_err(|e| anyhow::format_err!("{e:?}"))?
+    {
         println!("\t\t{:#x}\t{}", addr, insn);
     }
 
-    for (addr, insn) in disassembler.disassemble()? {
+    for (addr, insn) in disassembler
+        .disassemble()
+        .map_err(|e| anyhow::format_err!("{e:?}"))?
+    {
         println!("{:#x}\t{}", addr, insn);
     }
 

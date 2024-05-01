@@ -3,8 +3,6 @@ name = "rusty-date"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [package.metadata.cargo-xbuild]
 memcpy = false
 sysroot_path = "target/sysroot"
@@ -24,11 +22,12 @@ opt-level = 'z'
 lto = true
 
 [dependencies]
-crankstart = { path = "../../crankstart" }
-crankstart-sys = { path = "../../crankstart/crankstart-sys" }
+crankstart = { git = "https://github.com/pd-rs/crankstart" }
+crankstart-sys = { git = "https://github.com/pd-rs/crankstart" }
 anyhow = { version = "1.0.31", default-features = false }
 euclid = { version = "0.22.9", default-features = false, features = [ "libm" ] }
-hashbrown = "0.14.0"
+rusty-boy = { path = "../rusty-boy" }
+cartridge = { path = "../cartridge" }
 
 [dependencies.cstr_core]
 version = "=0.1.2"

@@ -3,12 +3,23 @@ use core::slice::Iter;
 
 use cartridge::header::CartridgeHeader;
 
-use anyhow::bail;
 use sm83::decoder::{
     Bit, Condition, Register, RegisterPair, RegisterPairMem, RegisterPairStack, ResetTarget,
 };
 
 use sm83::memory::Memory;
+
+#[derive(Debug)]
+pub enum Error {
+    NoEntrypoint,
+    CartridgeError(cartridge::header::Error),
+}
+
+impl From<cartridge::header::Error> for Error {
+    fn from(value: cartridge::header::Error) -> Self {
+        Self::CartridgeError(value)
+    }
+}
 
 pub struct Disassembler<'a> {
     data: &'a [u8],
@@ -19,16 +30,15 @@ impl<'a> Disassembler<'a> {
         Self { data }
     }
 
-    pub fn header(&'a self) -> anyhow::Result<CartridgeHeader<'a>> {
-        Ok(CartridgeHeader::new(self.data)
-            .map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?)
+    pub fn header(&'a self) -> Result<CartridgeHeader<'a>, Error> {
+        Ok(CartridgeHeader::new(self.data)?)
     }
 
-    pub fn entrypoint(&'a self) -> anyhow::Result<InstructionIter<Cloned<Iter<'a, u8>>>> {
+    pub fn entrypoint(&'a self) -> Result<InstructionIter<Cloned<Iter<'a, u8>>>, Error> {
         Ok(InstructionIter::new(self.header()?.entrypoint, 0x100))
     }
 
-    pub fn disassemble(&self) -> anyhow::Result<InstructionIter<Cloned<Iter<'a, u8>>>> {
+    pub fn disassemble(&self) -> Result<InstructionIter<Cloned<Iter<'a, u8>>>, Error> {
         let mut entrypoint = None;
         for (_addr, insn) in InstructionIter::new(self.header()?.entrypoint, 0x100) {
             match insn {
@@ -40,7 +50,7 @@ impl<'a> Disassembler<'a> {
         }
 
         let Some(entrypoint) = entrypoint else {
-            bail!("Entrypoint not found");
+            return Err(Error::NoEntrypoint);
         };
 
         Ok(InstructionIter::new(

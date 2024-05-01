@@ -39,6 +39,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1fdabc7756949593fe60f30ec81974b613357de856987752631dea1e3394c80"
 
 [[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
+
+[[package]]
+name = "cartridge"
+version = "0.1.0"
+dependencies = [
+ "sm83",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -47,6 +60,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "crankstart"
 version = "0.1.2"
+source = "git+https://github.com/pd-rs/crankstart#64391611b5356f3ee9761511a65cf4a681f19e76"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -59,6 +73,7 @@ dependencies = [
 [[package]]
 name = "crankstart-sys"
 version = "0.1.2"
+source = "git+https://github.com/pd-rs/crankstart#64391611b5356f3ee9761511a65cf4a681f19e76"
 dependencies = [
  "euclid",
 ]
@@ -89,6 +104,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hash32"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d60b12902ba28e2730cd37e95b8c9223af2808df9e902d4df49588d1470606"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -99,10 +123,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "heapless"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
+dependencies = [
+ "hash32",
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "libm"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
+
+[[package]]
+name = "log"
+version = "0.4.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 
 [[package]]
 name = "memchr"
@@ -127,6 +167,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
 
 [[package]]
+name = "ppu"
+version = "0.1.0"
+dependencies = [
+ "heapless",
+ "log",
+ "sm83",
+ "static_assertions",
+ "tock-registers",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -145,16 +196,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusty-boy"
+version = "0.1.0"
+dependencies = [
+ "cartridge",
+ "log",
+ "ppu",
+ "sm83",
+ "timer",
+]
+
+[[package]]
 name = "rusty-date"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cartridge",
  "crankstart",
  "crankstart-sys",
  "cstr_core",
  "euclid",
- "hashbrown",
+ "rusty-boy",
 ]
+
+[[package]]
+name = "sm83"
+version = "0.1.0"
+dependencies = [
+ "sm83_decoder_macros",
+]
+
+[[package]]
+name = "sm83_decoder_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "syn"
@@ -166,6 +257,22 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "timer"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "sm83",
+ "static_assertions",
+ "tock-registers",
+]
+
+[[package]]
+name = "tock-registers"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b9e2fdb3a1e862c0661768b7ed25390811df1947a8acbfbefe09b47078d93c4"
 
 [[package]]
 name = "unicode-ident"

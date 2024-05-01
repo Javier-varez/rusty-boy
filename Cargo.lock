@@ -347,6 +347,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rb-disasm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "rusty-boy",
+]
+
+[[package]]
 name = "regex"
 version = "1.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -379,6 +388,17 @@ checksum = "adad44e29e4c806119491a7f06f03de4d1af22c3a680dd47f1e6e179439d1f56"
 name = "rusty-boy"
 version = "0.1.0"
 dependencies = [
+ "cartridge",
+ "log",
+ "ppu",
+ "sm83",
+ "timer",
+]
+
+[[package]]
+name = "rusty-boy-sdl"
+version = "0.1.0"
+dependencies = [
  "anyhow",
  "cartridge",
  "clap",
@@ -386,9 +406,8 @@ dependencies = [
  "log",
  "png",
  "ppu",
+ "rusty-boy",
  "sdl2",
- "sm83",
- "timer",
 ]
 
 [[package]]
