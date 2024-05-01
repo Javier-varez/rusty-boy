@@ -154,7 +154,12 @@ impl Ppu {
     }
 
     /// Runs the PPU for the given number of cycles and then returns the PPU state
-    pub fn step(&mut self, cycles: Cycles, dma_engine: &mut DmaEngine) -> (Interrupts, PpuResult) {
+    pub fn step(
+        &mut self,
+        cycles: Cycles,
+        dma_engine: &mut DmaEngine,
+        render: bool,
+    ) -> (Interrupts, PpuResult) {
         self.cycles = (self.cycles + cycles).wrap(CYCLES_PER_FRAME);
 
         let line = current_line(self.cycles);
@@ -164,7 +169,7 @@ impl Ppu {
             dma_engine.trigger(self.regs.dma_config.address);
             self.regs.dma_config.triggered = false;
         }
-        let (interrupts, result) = self.step_inner(new_mode, line);
+        let (interrupts, result) = self.step_inner(new_mode, line, render);
         (interrupts | self.update_lcd_irq(), result)
     }
 
@@ -216,7 +221,7 @@ impl Ppu {
             .collect();
     }
 
-    fn step_inner(&mut self, new_mode: Mode, line: usize) -> (Interrupts, PpuResult) {
+    fn step_inner(&mut self, new_mode: Mode, line: usize, render: bool) -> (Interrupts, PpuResult) {
         const NO_IRQ: Interrupts = Interrupts::new();
         if self.mode == new_mode {
             self.update_registers(line);
@@ -226,17 +231,17 @@ impl Ppu {
         self.mode = new_mode;
 
         match self.mode {
-            Mode::OamScan => {
+            Mode::OamScan if render => {
                 self.oam_scan(line);
             }
-            Mode::Hblank => {}
-            Mode::DrawingPixels => {
+            Mode::DrawingPixels if render => {
                 self.draw_line(line);
             }
             Mode::Vblank => {
                 self.update_registers(line);
                 return (Interrupt::Vblank.into(), PpuResult::FrameComplete);
             }
+            _ => {}
         }
 
         self.update_registers(line);

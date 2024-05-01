@@ -71,7 +71,8 @@ impl<'a> Game for State<'a> {
 
         self.rusty_boy.update_keys(&state);
 
-        let frame = self.rusty_boy.run_until_next_frame();
+        self.rusty_boy.run_until_next_frame(false);
+        let frame = self.rusty_boy.run_until_next_frame(true);
 
         let graphics = Graphics::get();
         let target = graphics.get_frame()?;

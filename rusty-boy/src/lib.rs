@@ -50,7 +50,7 @@ impl<'a> RustyBoy<'a> {
         self.address_space.cartridge.battery_backed_ram()
     }
 
-    fn step(&mut self) -> PpuResult {
+    fn step(&mut self, render: bool) -> PpuResult {
         if self.debug {
             let pc = self.cpu.get_regs().pc_reg;
             let inst = disassembler::disassemble_single_inst(&mut self.address_space, pc);
@@ -78,7 +78,9 @@ impl<'a> RustyBoy<'a> {
         };
 
         let (ppu_interrupts, ppu_result) =
-            self.address_space.ppu.step(cycles, &mut self.dma_engine);
+            self.address_space
+                .ppu
+                .step(cycles, &mut self.dma_engine, render);
         let timer_interrupts = self.address_space.timer.step(cycles);
         self.dma_engine.run(cycles, &mut self.address_space);
 
@@ -89,8 +91,11 @@ impl<'a> RustyBoy<'a> {
         ppu_result
     }
 
-    pub fn run_until_next_frame(&mut self) -> &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT] {
-        while PpuResult::FrameComplete != self.step() {}
+    pub fn run_until_next_frame(
+        &mut self,
+        render: bool,
+    ) -> &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT] {
+        while PpuResult::FrameComplete != self.step(render) {}
         self.address_space.ppu.frame()
     }
 
