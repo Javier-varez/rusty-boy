@@ -144,9 +144,9 @@ const fn add16(a: u16, b: u16, flags: Flags) -> (u16, Flags) {
 const fn sub(a: u8, b: u8, carry: bool) -> (u8, Flags) {
     let a = a as u16;
     let b = b as u16;
-    let carry = carry as u16;
-    let inv = (!(b + carry)).wrapping_add(1); // 2's compliment of a + b
-    let result = a + inv;
+    let b_plus_carry = b.wrapping_add(carry as u16);
+    let inv = (!b_plus_carry).wrapping_add(1); // 2's compliment of a + b
+    let result = a.wrapping_add(inv);
 
     let flags = Flags::new()
         .with(Flag::Z, (result & 0xFF) == 0)
