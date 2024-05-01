@@ -45,23 +45,23 @@ impl<'a> Game for State<'a> {
     fn update(&mut self, _playdate: &mut Playdate) -> Result<(), Error> {
         let mut state = rusty_boy::joypad::State::new();
 
-        let (_, pushed, _) = System::get().get_button_state()?;
-        if (pushed & PDButtons::kButtonA).0 != 0 {
+        let (current, _, _) = System::get().get_button_state()?;
+        if (current & PDButtons::kButtonA).0 != 0 {
             state.a = true;
         }
-        if (pushed & PDButtons::kButtonB).0 != 0 {
+        if (current & PDButtons::kButtonB).0 != 0 {
             state.b = true;
         }
-        if (pushed & PDButtons::kButtonLeft).0 != 0 {
+        if (current & PDButtons::kButtonLeft).0 != 0 {
             state.left = true;
         }
-        if (pushed & PDButtons::kButtonRight).0 != 0 {
+        if (current & PDButtons::kButtonRight).0 != 0 {
             state.right = true;
         }
-        if (pushed & PDButtons::kButtonUp).0 != 0 {
+        if (current & PDButtons::kButtonUp).0 != 0 {
             state.up = true;
         }
-        if (pushed & PDButtons::kButtonDown).0 != 0 {
+        if (current & PDButtons::kButtonDown).0 != 0 {
             state.down = true;
         }
         let crank = System::get().is_crank_docked()?;
