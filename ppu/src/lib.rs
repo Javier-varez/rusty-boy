@@ -1,5 +1,9 @@
 #![no_std]
 
+extern crate alloc;
+
+use alloc::boxed::Box;
+
 pub mod dma;
 pub mod modes;
 pub mod oam;
@@ -92,7 +96,7 @@ pub struct Ppu {
     selected_oam_entries: heapless::Vec<usize, MAX_SELECTED_OBJECTS>,
 
     /// Origin of coordinates is top-left pixel.
-    framebuffer: Frame,
+    framebuffer: Box<Frame>,
 }
 
 const CYCLES_PER_FRAME: usize = 70224;
@@ -141,7 +145,7 @@ impl Ppu {
             cycles: Cycles::new(0),
             stat_irq: false,
             selected_oam_entries: heapless::Vec::new(),
-            framebuffer: [[Color::White; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
+            framebuffer: Box::new(unsafe { core::mem::MaybeUninit::uninit().assume_init() }),
         }
     }
 

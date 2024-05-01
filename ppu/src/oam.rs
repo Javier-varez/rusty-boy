@@ -2,6 +2,10 @@
 
 use static_assertions::assert_eq_size;
 
+extern crate alloc;
+
+use alloc::boxed::Box;
+
 use crate::vram::TileIndex;
 
 use tock_registers::interfaces::{Readable, Writeable};
@@ -93,18 +97,18 @@ pub const OAM_SIZE: usize = OBJECT_SIZE * NUM_OBJECTS;
 
 #[repr(C)]
 pub struct Oam {
-    objects: [Object; NUM_OBJECTS],
+    objects: Box<[Object; NUM_OBJECTS]>,
 }
 
-assert_eq_size!([u8; OAM_SIZE], Oam);
+// assert_eq_size!([u8; OAM_SIZE], Oam);
 
 impl Oam {
     const OAM_BASE: usize = 0xFE00;
 
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         const OBJECT: Object = Object::new();
         Self {
-            objects: [OBJECT; NUM_OBJECTS],
+            objects: Box::new([OBJECT; NUM_OBJECTS]),
         }
     }
 
@@ -118,7 +122,7 @@ impl Oam {
     }
 
     pub fn objects(&self) -> &[Object] {
-        &self.objects
+        &*self.objects
     }
 }
 

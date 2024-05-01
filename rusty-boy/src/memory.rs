@@ -7,6 +7,8 @@ use timer::Timer;
 extern crate alloc;
 use alloc::boxed::Box;
 
+use core::mem::MaybeUninit;
+
 pub type Wram = Box<[u8; 0x2000]>;
 pub type Hram = Box<[u8; 0x7f]>;
 
@@ -28,8 +30,8 @@ impl<'a> GbAddressSpace<'a> {
         Self {
             cartridge,
             ppu: Ppu::new(),
-            wram: Box::new([0; 0x2000]),
-            hram: Box::new([0; 0x7f]),
+            wram: Box::new(unsafe { MaybeUninit::uninit().assume_init() }),
+            hram: Box::new(unsafe { MaybeUninit::uninit().assume_init() }),
             interrupt_regs: InterruptRegs::new(),
             joypad: Joypad::new(),
             timer: Timer::new(),

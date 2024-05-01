@@ -9,26 +9,17 @@ use rusty_boy::RustyBoy;
 use {
     alloc::{boxed::Box, vec},
     anyhow::Error,
-    crankstart::{
-        crankstart_game,
-        geometry::{ScreenPoint, ScreenVector},
-        graphics::{Graphics, LCDColor, LCDSolidColor},
-        system::System,
-        Game, Playdate,
-    },
-    crankstart_sys::{LCD_COLUMNS, LCD_ROWS},
-    euclid::{point2, vec2},
+    crankstart::{crankstart_game, graphics::Graphics, system::System, Game, Playdate},
+    crankstart_sys::{LCD_COLUMNS, LCD_ROWS, LCD_ROWSIZE},
 };
 
 struct State<'a> {
-    rusty_boy: Box<RustyBoy<'a>>,
-    location: ScreenPoint,
-    velocity: ScreenVector,
+    rusty_boy: RustyBoy<'a>,
 }
 
 impl<'a> State<'a> {
     pub fn new(_playdate: &Playdate) -> Result<Box<Self>, Error> {
-        crankstart::display::Display::get().set_refresh_rate(20.0)?;
+        crankstart::display::Display::get().set_refresh_rate(60.0)?;
         let fs = crankstart::file::FileSystem::get();
         let file = fs.open("readme.txt", crankstart_sys::FileOptions::kFileWrite)?;
         file.write("Put roms here".as_bytes())?;
@@ -45,46 +36,72 @@ impl<'a> State<'a> {
         let cartridge = Cartridge::new(rom).map_err(|e| anyhow::format_err!("{e:?}"))?;
 
         Ok(Box::new(Self {
-            location: point2(INITIAL_X, INITIAL_Y),
-            velocity: vec2(1, 2),
-            rusty_boy: Box::new(RustyBoy::new_with_cartridge(cartridge)),
+            rusty_boy: RustyBoy::new_with_cartridge(cartridge),
         }))
     }
 }
 
 impl<'a> Game for State<'a> {
     fn update(&mut self, _playdate: &mut Playdate) -> Result<(), Error> {
-        let graphics = Graphics::get();
-        graphics.clear_context()?;
-        graphics.clear(LCDColor::Solid(LCDSolidColor::kColorWhite))?;
-        graphics.draw_text("Hello World Rust", self.location)?;
-
-        self.location += self.velocity;
-
-        if self.location.x < 0 || self.location.x > LCD_COLUMNS as i32 - TEXT_WIDTH {
-            self.velocity.x = -self.velocity.x;
-        }
-
-        if self.location.y < 0 || self.location.y > LCD_ROWS as i32 - TEXT_HEIGHT {
-            self.velocity.y = -self.velocity.y;
-        }
+        let mut state = rusty_boy::joypad::State::new();
 
         let (_, pushed, _) = System::get().get_button_state()?;
         if (pushed & PDButtons::kButtonA).0 != 0 {
-            log_to_console!("Button A pushed");
+            state.a = true;
+        }
+        if (pushed & PDButtons::kButtonB).0 != 0 {
+            state.b = true;
+        }
+        if (pushed & PDButtons::kButtonLeft).0 != 0 {
+            state.left = true;
+        }
+        if (pushed & PDButtons::kButtonRight).0 != 0 {
+            state.right = true;
+        }
+        if (pushed & PDButtons::kButtonUp).0 != 0 {
+            state.up = true;
+        }
+        if (pushed & PDButtons::kButtonDown).0 != 0 {
+            state.down = true;
+        }
+        let crank = System::get().is_crank_docked()?;
+        if crank {
+            state.start = true;
         }
 
-        self.rusty_boy.run_until_next_frame();
+        self.rusty_boy.update_keys(&state);
+
+        let frame = self.rusty_boy.run_until_next_frame();
+
+        let graphics = Graphics::get();
+        let target = graphics.get_frame()?;
+
+        let x_offset = (LCD_COLUMNS as usize - 160) / 2;
+        let y_offset = (LCD_ROWS as usize - 144) / 2;
+
+        for (y, line) in frame.iter().enumerate() {
+            let target_line_offset = (y_offset + y) * LCD_ROWSIZE as usize;
+            let mut byte = 0;
+            for (x, pixel) in line.iter().enumerate() {
+                match *pixel {
+                    ppu::Color::White | ppu::Color::LightGrey => {
+                        byte |= 1 << (7 - (x % 8));
+                    }
+                    _ => {}
+                }
+
+                if x % 8 == 7 {
+                    target[target_line_offset + (x_offset + x) / 8] = byte;
+                    byte = 0;
+                }
+            }
+        }
+
+        graphics.mark_updated_rows((y_offset as i32)..=(y_offset + 144) as i32)?;
 
         System::get().draw_fps(0, 0)?;
         Ok(())
     }
 }
-
-const INITIAL_X: i32 = (400 - TEXT_WIDTH) / 2;
-const INITIAL_Y: i32 = (240 - TEXT_HEIGHT) / 2;
-
-const TEXT_WIDTH: i32 = 86;
-const TEXT_HEIGHT: i32 = 16;
 
 crankstart_game!(State);

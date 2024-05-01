@@ -216,6 +216,7 @@ dependencies = [
  "crankstart-sys",
  "cstr_core",
  "euclid",
+ "ppu",
  "rusty-boy",
 ]
 

@@ -1,5 +1,9 @@
 //! Implements the memory mapped interface to VRAM
 
+extern crate alloc;
+
+use alloc::boxed::Box;
+
 use super::PaletteIndex;
 
 /// The width of the tile
@@ -219,22 +223,22 @@ impl sm83::memory::Memory for TileMap {
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Vram {
-    pub(crate) tile_blocks: [TileBlock; NUM_TILE_BLOCKS],
-    pub(crate) tile_maps: [TileMap; NUM_TILE_MAPS],
+    pub(crate) tile_blocks: Box<[TileBlock; NUM_TILE_BLOCKS]>,
+    pub(crate) tile_maps: Box<[TileMap; NUM_TILE_MAPS]>,
 }
 
 // The VRAM occupies 0x2000 bytes.
-static_assertions::assert_eq_size!([u8; 0x2000], Vram);
+// static_assertions::assert_eq_size!([u8; 0x2000], Vram);
 
 impl Vram {
     const VRAM_BASE: u16 = 0x8000;
     const TILE_MAP_BASE: u16 = 0x9800;
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         const TILE_BLOCK: TileBlock = TileBlock::new();
         const TILE_MAP: TileMap = TileMap::new();
         Self {
-            tile_blocks: [TILE_BLOCK; NUM_TILE_BLOCKS],
-            tile_maps: [TILE_MAP; NUM_TILE_MAPS],
+            tile_blocks: Box::new([TILE_BLOCK; NUM_TILE_BLOCKS]),
+            tile_maps: Box::new([TILE_MAP; NUM_TILE_MAPS]),
         }
     }
 

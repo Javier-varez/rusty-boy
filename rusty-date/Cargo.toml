@@ -13,12 +13,12 @@ crate-type = ["staticlib", "cdylib"]
 
 [profile.dev]
 panic = "abort"
-opt-level = 'z'
+opt-level = 3
 lto = true
 
 [profile.release]
 panic = "abort"
-opt-level = 'z'
+opt-level = 3
 lto = true
 
 [dependencies]
@@ -28,6 +28,7 @@ anyhow = { version = "1.0.31", default-features = false }
 euclid = { version = "0.22.9", default-features = false, features = [ "libm" ] }
 rusty-boy = { path = "../rusty-boy" }
 cartridge = { path = "../cartridge" }
+ppu = { path = "../ppu" }
 
 [dependencies.cstr_core]
 version = "=0.1.2"
