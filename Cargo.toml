@@ -9,3 +9,7 @@ members = [
     "cartridge",
     "timer",
 ]
+
+exclude = [
+    "rusty-date",
+]
