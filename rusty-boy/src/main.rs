@@ -1,5 +1,5 @@
 use std::io::BufWriter;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
@@ -105,15 +105,43 @@ fn draw_surface_rgb888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()> 
     Ok(())
 }
 
+fn attempt_restore_save_file(rusty_boy: &mut RustyBoy, rom_path: &Path) -> anyhow::Result<()> {
+    let save_file_path = rom_path.with_extension(".save");
+
+    let data = match std::fs::read(&save_file_path) {
+        Ok(data) => data,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(v) => {
+            anyhow::bail!("Unable to read save file: {v}")
+        }
+    };
+
+    rusty_boy
+        .restore_cartridge_ram(&data)
+        .map_err(|e| anyhow::format_err!("Unable to load cartridge ram: {}", e))?;
+
+    Ok(())
+}
+
+fn save_file(rom_path: &Path, data: &[u8]) -> anyhow::Result<()> {
+    let save_file_path = rom_path.with_extension(".save");
+    std::fs::write(&save_file_path, data)?;
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let args = Args::parse();
 
-    let rom_data = std::fs::read(args.rom_path)?;
+    let rom_data = std::fs::read(&args.rom_path)?;
     let cartridge =
         Cartridge::new(&rom_data).map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?;
     let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge)?;
+
+    if rusty_boy.supports_battery_backed_ram() {
+        attempt_restore_save_file(&mut rusty_boy, &args.rom_path)?;
+    }
 
     if args.debug {
         rusty_boy.enable_debug()
@@ -221,6 +249,12 @@ fn main() -> anyhow::Result<()> {
         sleep_until(next_deadline);
 
         frame_id += 1;
+    }
+
+    if rusty_boy.supports_battery_backed_ram() {
+        if let Some(ram) = rusty_boy.get_cartridge_ram() {
+            save_file(&args.rom_path, ram)?;
+        }
     }
 
     Ok(())

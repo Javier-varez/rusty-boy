@@ -134,4 +134,22 @@ impl<'a> Mbc1<'a> {
             _ => unimplemented!(),
         }
     }
+
+    pub fn ram(&self) -> &[u8] {
+        &self.ram
+    }
+
+    pub fn restore_ram(&mut self, ram: &[u8]) -> Result<(), crate::Error> {
+        if ram.len() != self.ram.len() {
+            return Err(crate::Error::UnexpectedRamSize {
+                expected: self.ram.len(),
+                actual: ram.len(),
+            });
+        }
+        self.ram
+            .iter_mut()
+            .zip(ram.iter())
+            .for_each(|(d, s)| *d = *s);
+        Ok(())
+    }
 }

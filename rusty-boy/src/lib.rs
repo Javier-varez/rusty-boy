@@ -34,6 +34,20 @@ impl<'a> RustyBoy<'a> {
         self.debug = true;
     }
 
+    pub fn supports_battery_backed_ram(&mut self) -> bool {
+        self.address_space.cartridge.has_battery()
+    }
+
+    pub fn restore_cartridge_ram(&mut self, data: &[u8]) -> Result<(), cartridge::Error> {
+        self.address_space
+            .cartridge
+            .restore_battery_backed_ram(data)
+    }
+
+    pub fn get_cartridge_ram(&mut self) -> Option<&[u8]> {
+        self.address_space.cartridge.battery_backed_ram()
+    }
+
     fn step(&mut self) -> PpuResult {
         if self.debug {
             let pc = self.cpu.get_regs().pc_reg;
