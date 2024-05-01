@@ -1,3 +1,5 @@
+#![no_std]
+
 pub mod dma;
 pub mod modes;
 pub mod oam;
@@ -87,7 +89,7 @@ pub struct Ppu {
     stat_irq: bool,
 
     // Vector of indexes into OAM entries
-    selected_oam_entries: Vec<usize>,
+    selected_oam_entries: heapless::Vec<usize, MAX_SELECTED_OBJECTS>,
 
     /// Origin of coordinates is top-left pixel.
     framebuffer: Frame,
@@ -138,7 +140,7 @@ impl Ppu {
             mode: Mode::OamScan,
             cycles: Cycles::new(0),
             stat_irq: false,
-            selected_oam_entries: Vec::with_capacity(MAX_SELECTED_OBJECTS),
+            selected_oam_entries: heapless::Vec::new(),
             framebuffer: [[Color::White; DISPLAY_WIDTH]; DISPLAY_HEIGHT],
         }
     }
@@ -190,7 +192,7 @@ impl Ppu {
     }
 
     fn oam_scan(&mut self, line: usize) {
-        self.selected_oam_entries.shrink_to(0);
+        self.selected_oam_entries = heapless::Vec::new();
 
         let obj_height = (self.regs.lcdc.read(regs::LCDC::OBJ_SIZE) + 1) * 8;
 

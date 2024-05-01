@@ -1,3 +1,5 @@
+#![no_std]
+
 pub mod disassembler;
 pub mod joypad;
 pub mod memory;

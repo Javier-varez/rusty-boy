@@ -4,6 +4,9 @@ use ppu::Ppu;
 use sm83::interrupts::InterruptRegs;
 use timer::Timer;
 
+extern crate alloc;
+use alloc::boxed::Box;
+
 pub type Wram = Box<[u8; 0x2000]>;
 pub type Hram = Box<[u8; 0x7f]>;
 
@@ -18,7 +21,6 @@ pub struct GbAddressSpace<'a> {
 
     pub sb: u8,
     pub sc: u8,
-    pub serial_data: Vec<u8>,
 }
 
 impl<'a> GbAddressSpace<'a> {
@@ -33,7 +35,6 @@ impl<'a> GbAddressSpace<'a> {
             timer: Timer::new(),
             sb: 0,
             sc: 0,
-            serial_data: vec![],
         }
     }
 }
@@ -76,10 +77,6 @@ impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
             0xFF01 => self.sb = value,
             0xFF02 => {
                 self.sc = value;
-                if self.sc & 0x80 != 0 {
-                    self.serial_data.push(self.sb);
-                    log::info!("S: {}", String::from_utf8_lossy(&self.serial_data));
-                }
                 self.sc &= 0x7f;
             }
             0xFF04..=0xFF07 => self.timer.write(address, value),

@@ -1,5 +1,5 @@
-use std::iter::Cloned;
-use std::slice::Iter;
+use core::iter::Cloned;
+use core::slice::Iter;
 
 use cartridge::header::CartridgeHeader;
 
@@ -245,8 +245,8 @@ impl Instruction {
     }
 }
 
-impl std::fmt::Display for Instruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Instruction {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Instruction::Ld8RegReg(dest, src) => {
                 write!(
