@@ -102,8 +102,6 @@ pub struct Oam {
     objects: Box<[Object; NUM_OBJECTS]>,
 }
 
-// assert_eq_size!([u8; OAM_SIZE], Oam);
-
 impl Oam {
     const OAM_BASE: usize = 0xFE00;
 

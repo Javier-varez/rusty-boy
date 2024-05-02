@@ -244,9 +244,6 @@ pub struct Vram {
     pub(crate) tile_maps: Box<[TileMap; NUM_TILE_MAPS]>,
 }
 
-// The VRAM occupies 0x2000 bytes.
-// static_assertions::assert_eq_size!([u8; 0x2000], Vram);
-
 impl Vram {
     const VRAM_BASE: u16 = 0x8000;
     const TILE_MAP_BASE: u16 = 0x9800;
