@@ -158,10 +158,8 @@ impl Registers {
         self.status
             .set((self.status.get() & RO_BITS) | (new_val & !RO_BITS));
     }
-}
 
-impl sm83::memory::Memory for Registers {
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    pub fn read(&self, address: sm83::memory::Address) -> u8 {
         match address {
             0xFF40 => self.lcdc.get(),
             0xFF41 => self.status.get(),
@@ -181,7 +179,7 @@ impl sm83::memory::Memory for Registers {
         }
     }
 
-    fn write(&mut self, address: sm83::memory::Address, value: u8) {
+    pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         match address {
             0xFF40 => self.lcdc.set(value),
             0xFF41 => self.set_status_reg(value),

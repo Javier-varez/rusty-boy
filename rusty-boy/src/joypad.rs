@@ -1,5 +1,3 @@
-use sm83::memory::Memory;
-
 pub struct Joypad {
     buttons: u8,
     dpad: u8,
@@ -36,10 +34,8 @@ impl Joypad {
             & to_bit(state.up, 2)
             & to_bit(state.down, 3);
     }
-}
 
-impl Memory for Joypad {
-    fn read(&mut self, _: sm83::memory::Address) -> u8 {
+    pub fn read(&self, _: sm83::memory::Address) -> u8 {
         if self.sel_dpad && self.sel_buttons {
             self.dpad & self.buttons
         } else if self.sel_dpad {
@@ -51,7 +47,7 @@ impl Memory for Joypad {
         }
     }
 
-    fn write(&mut self, _: sm83::memory::Address, value: u8) {
+    pub fn write(&mut self, _: sm83::memory::Address, value: u8) {
         self.sel_dpad = value & 0x10 == 0;
         self.sel_buttons = value & 0x20 == 0;
     }

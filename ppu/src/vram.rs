@@ -57,20 +57,18 @@ impl TileLine {
             (true, true) => PaletteIndex::Id3,
         }
     }
-}
 
-// A tile line must occupy 2 bytes
-static_assertions::assert_eq_size!([u8; 2], TileLine);
-
-impl sm83::memory::Memory for TileLine {
     fn write(&mut self, address: sm83::memory::Address, value: u8) {
         self.0[address as usize] = value;
     }
 
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    fn read(&self, address: sm83::memory::Address) -> u8 {
         self.0[address as usize]
     }
 }
+
+// A tile line must occupy 2 bytes
+static_assertions::assert_eq_size!([u8; 2], TileLine);
 
 pub struct TileLineIter {
     tile_line: TileLine,
@@ -113,15 +111,13 @@ impl Tile {
     pub fn get_line(&self, line: usize) -> TileLine {
         self.0[line]
     }
-}
 
-impl sm83::memory::Memory for Tile {
     fn write(&mut self, address: sm83::memory::Address, value: u8) {
         let (line_idx, line_address) = Self::tile_address_to_tile_line_address(address);
         self.0[line_idx].write(line_address, value)
     }
 
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    fn read(&self, address: sm83::memory::Address) -> u8 {
         let (line_idx, line_address) = Self::tile_address_to_tile_line_address(address);
         self.0[line_idx].read(line_address)
     }
@@ -155,15 +151,13 @@ impl TileBlock {
     pub(crate) fn get_tile(&self, index: usize) -> &Tile {
         &self.0[index]
     }
-}
 
-impl sm83::memory::Memory for TileBlock {
     fn write(&mut self, address: sm83::memory::Address, value: u8) {
         let (tile_idx, tile_address) = Self::block_address_to_tile_address(address);
         self.0[tile_idx].write(tile_address, value)
     }
 
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    fn read(&self, address: sm83::memory::Address) -> u8 {
         let (tile_idx, tile_address) = Self::block_address_to_tile_address(address);
         self.0[tile_idx].read(tile_address)
     }
@@ -221,16 +215,14 @@ impl TileMap {
         let line = (line / TILE_HEIGHT) % TILE_MAP_HEIGHT;
         &self.0[line]
     }
-}
 
-impl sm83::memory::Memory for TileMap {
     fn write(&mut self, address: sm83::memory::Address, value: u8) {
         let line = address as usize / TILE_MAP_WIDTH;
         let offset = address as usize % TILE_MAP_WIDTH;
         self.0[line][offset] = TileIndex(value);
     }
 
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    fn read(&self, address: sm83::memory::Address) -> u8 {
         let line = address as usize / TILE_MAP_WIDTH;
         let offset = address as usize % TILE_MAP_WIDTH;
         self.0[line][offset].0
@@ -239,14 +231,22 @@ impl sm83::memory::Memory for TileMap {
 
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Vram {
-    pub(crate) tile_blocks: Box<[TileBlock; NUM_TILE_BLOCKS]>,
-    pub(crate) tile_maps: Box<[TileMap; NUM_TILE_MAPS]>,
+struct VramImpl {
+    tile_blocks: [TileBlock; NUM_TILE_BLOCKS],
+    tile_maps: [TileMap; NUM_TILE_MAPS],
 }
+
+// The VRAM occupies 0x2000 bytes.
+static_assertions::assert_eq_size!([u8; 0x2000], VramImpl);
+
+#[repr(C)]
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct Vram(Box<VramImpl>);
 
 impl Vram {
     const VRAM_BASE: u16 = 0x8000;
     const TILE_MAP_BASE: u16 = 0x9800;
+
     pub fn new() -> Self {
         const UNINIT_TILE_BLOCK: MaybeUninit<TileBlock> = MaybeUninit::uninit();
         let mut tile_blocks = [UNINIT_TILE_BLOCK; NUM_TILE_BLOCKS];
@@ -260,18 +260,12 @@ impl Vram {
             tile.write(TileMap::new());
         }
 
-        Self {
+        Self(Box::new(VramImpl {
             tile_blocks: unsafe {
-                Box::new(core::mem::transmute::<_, [TileBlock; NUM_TILE_BLOCKS]>(
-                    tile_blocks,
-                ))
+                core::mem::transmute::<_, [TileBlock; NUM_TILE_BLOCKS]>(tile_blocks)
             },
-            tile_maps: unsafe {
-                Box::new(core::mem::transmute::<_, [TileMap; NUM_TILE_MAPS]>(
-                    tile_maps,
-                ))
-            },
-        }
+            tile_maps: unsafe { core::mem::transmute::<_, [TileMap; NUM_TILE_MAPS]>(tile_maps) },
+        }))
     }
 
     const fn vram_address_to_block_address(
@@ -296,8 +290,8 @@ impl Vram {
 
     pub(crate) fn get_bg_tile_map(&self, map: crate::regs::LCDC::BG_TILE_MAP::Value) -> &TileMap {
         match map {
-            crate::regs::LCDC::BG_TILE_MAP::Value::HighMap => &self.tile_maps[1],
-            crate::regs::LCDC::BG_TILE_MAP::Value::LowMap => &self.tile_maps[0],
+            crate::regs::LCDC::BG_TILE_MAP::Value::HighMap => &self.0.tile_maps[1],
+            crate::regs::LCDC::BG_TILE_MAP::Value::LowMap => &self.0.tile_maps[0],
         }
     }
 
@@ -306,8 +300,8 @@ impl Vram {
         map: crate::regs::LCDC::WINDOW_TILE_MAP::Value,
     ) -> &TileMap {
         match map {
-            crate::regs::LCDC::WINDOW_TILE_MAP::Value::HighMap => &self.tile_maps[1],
-            crate::regs::LCDC::WINDOW_TILE_MAP::Value::LowMap => &self.tile_maps[0],
+            crate::regs::LCDC::WINDOW_TILE_MAP::Value::HighMap => &self.0.tile_maps[1],
+            crate::regs::LCDC::WINDOW_TILE_MAP::Value::LowMap => &self.0.tile_maps[0],
         }
     }
 
@@ -322,28 +316,26 @@ impl Vram {
             crate::regs::LCDC::BG_AND_WINDOW_TILE_DATA::Value::Blocks0And1 => block,
             crate::regs::LCDC::BG_AND_WINDOW_TILE_DATA::Value::Blocks2And1 => 2 - block,
         };
-        self.tile_blocks[block].get_tile(index)
+        self.0.tile_blocks[block].get_tile(index)
     }
-}
 
-impl sm83::memory::Memory for Vram {
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    pub fn read(&self, address: sm83::memory::Address) -> u8 {
         if address < 0x9800 {
             let (blk_idx, blk_address) = Self::vram_address_to_block_address(address);
-            self.tile_blocks[blk_idx].read(blk_address)
+            self.0.tile_blocks[blk_idx].read(blk_address)
         } else {
             let (tile_map_idx, tile_map_address) = Self::vram_address_to_tile_map_address(address);
-            self.tile_maps[tile_map_idx].read(tile_map_address)
+            self.0.tile_maps[tile_map_idx].read(tile_map_address)
         }
     }
 
-    fn write(&mut self, address: sm83::memory::Address, value: u8) {
+    pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         if address < 0x9800 {
             let (blk_idx, blk_address) = Self::vram_address_to_block_address(address);
-            self.tile_blocks[blk_idx].write(blk_address, value)
+            self.0.tile_blocks[blk_idx].write(blk_address, value)
         } else {
             let (tile_map_idx, tile_map_address) = Self::vram_address_to_tile_map_address(address);
-            self.tile_maps[tile_map_idx].write(tile_map_address, value)
+            self.0.tile_maps[tile_map_idx].write(tile_map_address, value)
         }
     }
 }

@@ -60,14 +60,12 @@ impl<'a> Cartridge<'a> {
     pub fn restore_battery_backed_ram(&mut self, ram: &[u8]) -> Result<(), Error> {
         self.mapper.restore_battery_backed_ram(ram)
     }
-}
 
-impl<'a> sm83::memory::Memory for Cartridge<'a> {
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    pub fn read(&self, address: sm83::memory::Address) -> u8 {
         self.mapper.read(address)
     }
 
-    fn write(&mut self, address: sm83::memory::Address, value: u8) {
+    pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         self.mapper.write(address, value)
     }
 }

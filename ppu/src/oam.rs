@@ -130,15 +130,13 @@ impl Oam {
     pub fn objects(&self) -> &[Object] {
         &*self.objects
     }
-}
 
-impl sm83::memory::Memory for Oam {
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    pub fn read(&self, address: sm83::memory::Address) -> u8 {
         let (object_idx, object_member_offset) = Self::cpu_addr_to_object_addr(address);
         self.objects[object_idx].read(object_member_offset)
     }
 
-    fn write(&mut self, address: sm83::memory::Address, value: u8) {
+    pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         let (object_idx, object_member_offset) = Self::cpu_addr_to_object_addr(address);
         self.objects[object_idx].write(object_member_offset, value);
     }

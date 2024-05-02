@@ -476,10 +476,8 @@ impl Ppu {
                 + regs::STAT::LYC_EQ_LY.val((line == self.regs.lyc) as u8),
         );
     }
-}
 
-impl sm83::memory::Memory for Ppu {
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    pub fn read(&self, address: sm83::memory::Address) -> u8 {
         match address {
             0x8000..=0x9FFF => self.vram.read(address),
             0xFE00..=0xFE9F => self.oam.read(address),
@@ -490,7 +488,7 @@ impl sm83::memory::Memory for Ppu {
         }
     }
 
-    fn write(&mut self, address: sm83::memory::Address, value: u8) {
+    pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         match address {
             0x8000..=0x9FFF => self.vram.write(address, value),
             0xFE00..=0xFE9F => self.oam.write(address, value),

@@ -26,10 +26,8 @@ impl InterruptRegs {
     pub fn trigger(&mut self, interrupts: Interrupts) {
         self.flags_reg = self.flags_reg | interrupts;
     }
-}
 
-impl crate::memory::Memory for InterruptRegs {
-    fn read(&mut self, address: crate::memory::Address) -> u8 {
+    pub fn read(&self, address: crate::memory::Address) -> u8 {
         match address {
             0xFFFF => self.enable_reg.into(),
             0xFF0F => self.flags_reg.into(),
@@ -39,7 +37,7 @@ impl crate::memory::Memory for InterruptRegs {
         }
     }
 
-    fn write(&mut self, address: crate::memory::Address, value: u8) {
+    pub fn write(&mut self, address: crate::memory::Address, value: u8) {
         let value = Interrupts(value) & ALL_INTERRUPTS;
         match address {
             0xFFFF => self.enable_reg = value,

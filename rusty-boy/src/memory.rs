@@ -53,7 +53,7 @@ impl<'a> GbAddressSpace<'a> {
 }
 
 impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    fn read(&self, address: sm83::memory::Address) -> u8 {
         match address {
             0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cartridge.read(address),
             0xC000..=0xDFFF => self.wram[address as usize - 0xC000],

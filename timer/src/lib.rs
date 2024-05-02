@@ -110,10 +110,8 @@ impl Timer {
             Interrupts::new()
         }
     }
-}
 
-impl sm83::memory::Memory for Timer {
-    fn read(&mut self, address: sm83::memory::Address) -> u8 {
+    pub fn read(&self, address: sm83::memory::Address) -> u8 {
         match address {
             0xFF04 => (self.div >> HIDDEN_BITS) as u8,
             0xFF05 => self.tima,
@@ -123,7 +121,7 @@ impl sm83::memory::Memory for Timer {
         }
     }
 
-    fn write(&mut self, address: sm83::memory::Address, value: u8) {
+    pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         match address {
             0xFF04 => self.request_div_reset = true,
             0xFF05 => self.tima = value,

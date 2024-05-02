@@ -218,7 +218,7 @@ fn main() -> anyhow::Result<()> {
 
         let frame = {
             let frame_start = Instant::now();
-            let frame = rusty_boy.run_until_next_frame();
+            let frame = rusty_boy.run_until_next_frame(true);
             let frame_end = Instant::now();
             load += frame_end - frame_start;
             frame
