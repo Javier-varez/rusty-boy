@@ -136,6 +136,15 @@ fn mode_for_current_cycle_count(cycles: Cycles) -> Mode {
 impl Ppu {
     /// Constructs a PPU instance
     pub fn new() -> Self {
+        let mut framebuffer: [[core::mem::MaybeUninit<Color>; DISPLAY_WIDTH]; DISPLAY_HEIGHT] =
+            [[core::mem::MaybeUninit::uninit(); DISPLAY_WIDTH]; DISPLAY_HEIGHT];
+
+        for row in framebuffer.iter_mut() {
+            for elem in row {
+                elem.write(Color::Black);
+            }
+        }
+
         Self {
             vram: Vram::new(),
             regs: Registers::new(),
@@ -145,7 +154,7 @@ impl Ppu {
             cycles: Cycles::new(0),
             stat_irq: false,
             selected_oam_entries: heapless::Vec::new(),
-            framebuffer: Box::new(unsafe { core::mem::MaybeUninit::uninit().assume_init() }),
+            framebuffer: Box::new(unsafe { core::mem::transmute::<_, Frame>(framebuffer) }),
         }
     }
 

@@ -27,11 +27,22 @@ pub struct GbAddressSpace<'a> {
 
 impl<'a> GbAddressSpace<'a> {
     pub fn new(cartridge: Cartridge<'a>) -> Self {
+        let mut wram: [MaybeUninit<u8>; 0x2000] = [MaybeUninit::uninit(); 0x2000];
+        let mut hram: [MaybeUninit<u8>; 0x7f] = [MaybeUninit::uninit(); 0x7f];
+
+        for elem in wram.iter_mut() {
+            elem.write(0);
+        }
+
+        for elem in hram.iter_mut() {
+            elem.write(0);
+        }
+
         Self {
             cartridge,
             ppu: Ppu::new(),
-            wram: Box::new(unsafe { MaybeUninit::uninit().assume_init() }),
-            hram: Box::new(unsafe { MaybeUninit::uninit().assume_init() }),
+            wram: Box::new(unsafe { core::mem::transmute::<_, [u8; 0x2000]>(wram) }),
+            hram: Box::new(unsafe { core::mem::transmute::<_, [u8; 0x7f]>(hram) }),
             interrupt_regs: InterruptRegs::new(),
             joypad: Joypad::new(),
             timer: Timer::new(),

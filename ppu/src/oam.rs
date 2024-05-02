@@ -1,5 +1,7 @@
 //! Implements the memory mapped interface to OAM
 
+use core::mem::MaybeUninit;
+
 use static_assertions::assert_eq_size;
 
 extern crate alloc;
@@ -106,9 +108,15 @@ impl Oam {
     const OAM_BASE: usize = 0xFE00;
 
     pub fn new() -> Self {
-        const OBJECT: Object = Object::new();
+        const UNINIT: MaybeUninit<Object> = MaybeUninit::uninit();
+        let mut objects = [UNINIT; NUM_OBJECTS];
+
+        for elem in objects.iter_mut() {
+            elem.write(Object::new());
+        }
+
         Self {
-            objects: Box::new([OBJECT; NUM_OBJECTS]),
+            objects: unsafe { Box::new(core::mem::transmute::<_, [Object; NUM_OBJECTS]>(objects)) },
         }
     }
 

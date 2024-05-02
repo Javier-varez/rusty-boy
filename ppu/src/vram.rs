@@ -2,6 +2,8 @@
 
 extern crate alloc;
 
+use core::mem::MaybeUninit;
+
 use alloc::boxed::Box;
 
 use super::PaletteIndex;
@@ -133,9 +135,13 @@ pub(crate) struct TileBlock(pub(crate) [Tile; TILES_PER_BLOCK]);
 static_assertions::assert_eq_size!([u8; 2048], TileBlock);
 
 impl TileBlock {
-    const fn new() -> Self {
-        const TILE: Tile = Tile::new();
-        Self([TILE; TILES_PER_BLOCK])
+    fn new() -> Self {
+        const UNINIT: MaybeUninit<Tile> = MaybeUninit::uninit();
+        let mut tile_block = [UNINIT; TILES_PER_BLOCK];
+        for tile in tile_block.iter_mut() {
+            tile.write(Tile::new());
+        }
+        Self(unsafe { core::mem::transmute::<_, [Tile; TILES_PER_BLOCK]>(tile_block) })
     }
 
     fn block_address_to_tile_address(
@@ -196,8 +202,19 @@ pub const TILE_MAP_HEIGHT: usize = 32;
 pub(crate) struct TileMap(pub(crate) [[TileIndex; TILE_MAP_WIDTH]; TILE_MAP_HEIGHT]);
 
 impl TileMap {
-    const fn new() -> Self {
-        Self([[TileIndex(0); TILE_MAP_WIDTH]; TILE_MAP_HEIGHT])
+    fn new() -> Self {
+        const UNINIT: MaybeUninit<TileIndex> = MaybeUninit::uninit();
+        let mut tile_map = [[UNINIT; TILE_MAP_WIDTH]; TILE_MAP_HEIGHT];
+
+        for row in tile_map.iter_mut() {
+            for elem in row {
+                elem.write(TileIndex(0));
+            }
+        }
+
+        Self(unsafe {
+            core::mem::transmute::<_, [[TileIndex; TILE_MAP_WIDTH]; TILE_MAP_HEIGHT]>(tile_map)
+        })
     }
 
     pub fn line(&self, line: usize) -> &[TileIndex; TILE_MAP_WIDTH] {
@@ -234,11 +251,29 @@ impl Vram {
     const VRAM_BASE: u16 = 0x8000;
     const TILE_MAP_BASE: u16 = 0x9800;
     pub fn new() -> Self {
-        const TILE_BLOCK: TileBlock = TileBlock::new();
-        const TILE_MAP: TileMap = TileMap::new();
+        const UNINIT_TILE_BLOCK: MaybeUninit<TileBlock> = MaybeUninit::uninit();
+        let mut tile_blocks = [UNINIT_TILE_BLOCK; NUM_TILE_BLOCKS];
+        for tile in tile_blocks.iter_mut() {
+            tile.write(TileBlock::new());
+        }
+
+        const UNINIT_TILE_MAP: MaybeUninit<TileMap> = MaybeUninit::uninit();
+        let mut tile_maps = [UNINIT_TILE_MAP; NUM_TILE_MAPS];
+        for tile in tile_maps.iter_mut() {
+            tile.write(TileMap::new());
+        }
+
         Self {
-            tile_blocks: Box::new([TILE_BLOCK; NUM_TILE_BLOCKS]),
-            tile_maps: Box::new([TILE_MAP; NUM_TILE_MAPS]),
+            tile_blocks: unsafe {
+                Box::new(core::mem::transmute::<_, [TileBlock; NUM_TILE_BLOCKS]>(
+                    tile_blocks,
+                ))
+            },
+            tile_maps: unsafe {
+                Box::new(core::mem::transmute::<_, [TileMap; NUM_TILE_MAPS]>(
+                    tile_maps,
+                ))
+            },
         }
     }
 
