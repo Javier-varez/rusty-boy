@@ -3,6 +3,9 @@
 pub mod header;
 pub mod mappers;
 
+extern crate alloc;
+
+use alloc::vec::Vec;
 use header::CartridgeHeader;
 use mappers::Mapper;
 
@@ -20,35 +23,33 @@ impl core::fmt::Display for Error {
     }
 }
 
-pub struct Cartridge<'a> {
-    header: CartridgeHeader<'a>,
-    mapper: Mapper<'a>,
+pub struct Cartridge {
+    mapper: Mapper,
 }
 
-impl<'a> Cartridge<'a> {
-    pub fn new(data: &'a [u8]) -> Result<Self, header::Error> {
-        let header = CartridgeHeader::new(data)?;
-        let mapper = Mapper::new(&header, data);
-        Ok(Self { header, mapper })
+impl Cartridge {
+    pub fn new(rom_data: Vec<u8>) -> Result<Self, header::Error> {
+        let mapper = Mapper::new(rom_data)?;
+        Ok(Self { mapper })
     }
 
-    pub fn header(&self) -> &CartridgeHeader {
-        &self.header
+    pub fn header<'a>(&'a self) -> CartridgeHeader<'a> {
+        self.mapper.header().unwrap()
     }
 
     pub fn has_battery(&self) -> bool {
-        match self.header.cartridge_type {
-            CartridgeType::Mbc1RamBattery => true,
-            CartridgeType::Mbc2Battery => true,
-            CartridgeType::RomRamBattery => true,
-            CartridgeType::Mmm01RamBattery => true,
-            CartridgeType::Mbc3TimerBattery => true,
-            CartridgeType::Mbc3TimerRamBattery => true,
-            CartridgeType::Mbc3RamBattery => true,
-            CartridgeType::Mbc5RamBattery => true,
-            CartridgeType::Mbc5RumbleRamBattery => true,
-            CartridgeType::Mbc7SensorRumbleRamBattery => true,
-            CartridgeType::Huc1RamBattery => true,
+        match self.header().cartridge_type {
+            CartridgeType::Mbc1RamBattery
+            | CartridgeType::Mbc2Battery
+            | CartridgeType::RomRamBattery
+            | CartridgeType::Mmm01RamBattery
+            | CartridgeType::Mbc3TimerBattery
+            | CartridgeType::Mbc3TimerRamBattery
+            | CartridgeType::Mbc3RamBattery
+            | CartridgeType::Mbc5RamBattery
+            | CartridgeType::Mbc5RumbleRamBattery
+            | CartridgeType::Mbc7SensorRumbleRamBattery
+            | CartridgeType::Huc1RamBattery => true,
             _ => false,
         }
     }

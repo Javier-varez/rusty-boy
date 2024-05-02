@@ -10,15 +10,15 @@ use cartridge::Cartridge;
 use ppu::{dma::DmaEngine, Color, PpuResult, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use sm83::core::Cpu;
 
-pub struct RustyBoy<'a> {
+pub struct RustyBoy {
     cpu: Cpu,
     dma_engine: DmaEngine,
-    address_space: GbAddressSpace<'a>,
+    address_space: GbAddressSpace,
     debug: bool,
 }
 
-impl<'a> RustyBoy<'a> {
-    pub fn new_with_cartridge(cartridge: Cartridge<'a>) -> Self {
+impl RustyBoy {
+    pub fn new_with_cartridge(cartridge: Cartridge) -> Self {
         const ENTRYPOINT: u16 = 0x100;
 
         let mut cpu = Cpu::new();

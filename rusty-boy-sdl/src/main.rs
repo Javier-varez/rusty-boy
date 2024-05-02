@@ -136,7 +136,7 @@ fn main() -> anyhow::Result<()> {
 
     let rom_data = std::fs::read(&args.rom_path)?;
     let cartridge =
-        Cartridge::new(&rom_data).map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?;
+        Cartridge::new(rom_data).map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?;
     let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge);
 
     if rusty_boy.supports_battery_backed_ram() {

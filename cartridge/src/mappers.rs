@@ -1,37 +1,53 @@
-use crate::header::{CartridgeHeader, CartridgeType};
+use crate::header::{self, CartridgeHeader, CartridgeType};
+
+extern crate alloc;
+use alloc::vec::Vec;
 
 mod mbc1;
 mod mbc3;
 mod rom_only;
 
-pub enum Mapper<'a> {
-    RomOnly(rom_only::RomOnly<'a>),
-    Mbc1(mbc1::Mbc1<'a>),
-    Mbc1RamBattery(mbc1::Mbc1<'a>),
-    Mbc3(mbc3::Mbc3<'a>),
-    Mbc3RamBattery(mbc3::Mbc3<'a>),
+pub enum Mapper {
+    RomOnly(rom_only::RomOnly),
+    Mbc1(mbc1::Mbc1),
+    Mbc1RamBattery(mbc1::Mbc1),
+    Mbc3(mbc3::Mbc3),
+    Mbc3RamBattery(mbc3::Mbc3),
 }
 
-impl<'a> Mapper<'a> {
-    pub fn new(header: &CartridgeHeader, data: &'a [u8]) -> Self {
-        match header.cartridge_type {
+impl Mapper {
+    pub fn new(data: Vec<u8>) -> Result<Self, header::Error> {
+        let header = CartridgeHeader::new(&data)?;
+        let cartridge_type = header.cartridge_type;
+        let ram_size = header.ram_size.into_usize();
+        Ok(match cartridge_type {
             CartridgeType::RomOnly => Self::RomOnly(rom_only::RomOnly::new(data)),
             CartridgeType::Mbc1 | CartridgeType::Mbc1Ram => {
-                Self::Mbc1(mbc1::Mbc1::new(data, header.ram_size.into_usize().unwrap()))
+                Self::Mbc1(mbc1::Mbc1::new(data, ram_size.unwrap()))
             }
             CartridgeType::Mbc1RamBattery => {
-                Self::Mbc1RamBattery(mbc1::Mbc1::new(data, header.ram_size.into_usize().unwrap()))
+                Self::Mbc1RamBattery(mbc1::Mbc1::new(data, ram_size.unwrap()))
             }
             CartridgeType::Mbc3 | CartridgeType::Mbc3Ram => {
-                Self::Mbc3(mbc3::Mbc3::new(data, header.ram_size.into_usize().unwrap()))
+                Self::Mbc3(mbc3::Mbc3::new(data, ram_size.unwrap()))
             }
             CartridgeType::Mbc3RamBattery => {
-                Self::Mbc3RamBattery(mbc3::Mbc3::new(data, header.ram_size.into_usize().unwrap()))
+                Self::Mbc3RamBattery(mbc3::Mbc3::new(data, ram_size.unwrap()))
             }
             v => {
                 // Other cartridge types are currently unsupported
                 todo!("Cartridge support for mapper {v} is not implemented")
             }
+        })
+    }
+
+    pub fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
+        match self {
+            Self::RomOnly(rom_only) => rom_only.header(),
+            Self::Mbc1(mbc1) => mbc1.header(),
+            Self::Mbc1RamBattery(mbc1) => mbc1.header(),
+            Self::Mbc3(mbc3) => mbc3.header(),
+            Self::Mbc3RamBattery(mbc3) => mbc3.header(),
         }
     }
 

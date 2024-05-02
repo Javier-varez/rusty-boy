@@ -12,8 +12,8 @@ use core::mem::MaybeUninit;
 pub type Wram = Box<[u8; 0x2000]>;
 pub type Hram = Box<[u8; 0x7f]>;
 
-pub struct GbAddressSpace<'a> {
-    pub cartridge: Cartridge<'a>,
+pub struct GbAddressSpace {
+    pub cartridge: Cartridge,
     pub ppu: Ppu,
     pub wram: Wram,
     pub hram: Hram,
@@ -25,8 +25,8 @@ pub struct GbAddressSpace<'a> {
     pub sc: u8,
 }
 
-impl<'a> GbAddressSpace<'a> {
-    pub fn new(cartridge: Cartridge<'a>) -> Self {
+impl GbAddressSpace {
+    pub fn new(cartridge: Cartridge) -> Self {
         let mut wram: [MaybeUninit<u8>; 0x2000] = [MaybeUninit::uninit(); 0x2000];
         let mut hram: [MaybeUninit<u8>; 0x7f] = [MaybeUninit::uninit(); 0x7f];
 
@@ -52,7 +52,7 @@ impl<'a> GbAddressSpace<'a> {
     }
 }
 
-impl<'a> sm83::memory::Memory for GbAddressSpace<'a> {
+impl sm83::memory::Memory for GbAddressSpace {
     fn read(&self, address: sm83::memory::Address) -> u8 {
         match address {
             0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cartridge.read(address),

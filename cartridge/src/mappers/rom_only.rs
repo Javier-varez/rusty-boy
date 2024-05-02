@@ -1,10 +1,20 @@
-pub struct RomOnly<'a> {
-    data: &'a [u8],
+use crate::header::{self, CartridgeHeader};
+
+extern crate alloc;
+
+use alloc::vec::Vec;
+
+pub struct RomOnly {
+    data: Vec<u8>,
 }
 
-impl<'a> RomOnly<'a> {
-    pub fn new(data: &'a [u8]) -> Self {
+impl RomOnly {
+    pub fn new(data: Vec<u8>) -> Self {
         Self { data }
+    }
+
+    pub fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
+        CartridgeHeader::new(&self.data)
     }
 
     pub fn read(&self, address: sm83::memory::Address) -> u8 {

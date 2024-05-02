@@ -1,3 +1,5 @@
+use crate::header::{self, CartridgeHeader};
+
 extern crate alloc;
 
 use alloc::vec;
@@ -10,16 +12,16 @@ const RAM_BASE: usize = 0xA000;
 const RAM_BANK_SIZE: usize = 4 * 1024;
 const RAM_BANK_SELECT_MASK: usize = 0x0f;
 
-pub struct Mbc3<'a> {
+pub struct Mbc3 {
+    rom: Vec<u8>,
     ram: Vec<u8>,
-    rom: &'a [u8],
     ram_and_rtc_enabled: bool,
     selected_rom_bank: usize,
     selected_ram_bank: usize,
 }
 
-impl<'a> Mbc3<'a> {
-    pub fn new(rom: &'a [u8], ram_size: usize) -> Self {
+impl Mbc3 {
+    pub fn new(rom: Vec<u8>, ram_size: usize) -> Self {
         assert!(rom.len().count_ones() == 1); // ROM size must be a power of 2
         assert!(rom.len() < 2048 * 1024); // Max size of MB3 roms is 2 MiB
 
@@ -30,6 +32,10 @@ impl<'a> Mbc3<'a> {
             selected_rom_bank: 1,
             selected_ram_bank: 0,
         }
+    }
+
+    pub fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
+        CartridgeHeader::new(&self.rom)
     }
 
     fn read_rom(&self, address: usize) -> u8 {

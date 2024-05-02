@@ -1,3 +1,5 @@
+use crate::header::{self, CartridgeHeader};
+
 extern crate alloc;
 
 use alloc::vec;
@@ -19,17 +21,17 @@ enum Mode {
     Advanced = 1,
 }
 
-pub struct Mbc1<'a> {
+pub struct Mbc1 {
+    rom: Vec<u8>,
     ram: Vec<u8>,
-    rom: &'a [u8],
     ram_enabled: bool,
     selected_rom_bank: usize,
     selected_ram_bank: usize,
     mode: Mode,
 }
 
-impl<'a> Mbc1<'a> {
-    pub fn new(rom: &'a [u8], ram_size: usize) -> Self {
+impl Mbc1 {
+    pub fn new(rom: Vec<u8>, ram_size: usize) -> Self {
         assert!(rom.len().count_ones() == 1); // ROM size must be a power of 2
         assert!(rom.len() < 512 * 1024); // ROMs larger than 512 KiB are currently unsupported
 
@@ -41,6 +43,10 @@ impl<'a> Mbc1<'a> {
             selected_ram_bank: 0,
             mode: Mode::Simple,
         }
+    }
+
+    pub fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
+        CartridgeHeader::new(&self.rom)
     }
 
     fn read_rom(&self, address: usize) -> u8 {

@@ -3,7 +3,6 @@
 extern crate alloc;
 
 use cartridge::Cartridge;
-use crankstart::log_to_console;
 use crankstart_sys::PDButtons;
 use rusty_boy::RustyBoy;
 use {
@@ -13,13 +12,13 @@ use {
     crankstart_sys::{LCD_COLUMNS, LCD_ROWS, LCD_ROWSIZE},
 };
 
-struct State<'a> {
-    rusty_boy: RustyBoy<'a>,
+struct State {
+    rusty_boy: RustyBoy,
 }
 
-impl<'a> State<'a> {
+impl State {
     pub fn new(_playdate: &Playdate) -> Result<Box<Self>, Error> {
-        crankstart::display::Display::get().set_refresh_rate(60.0)?;
+        crankstart::display::Display::get().set_refresh_rate(30.0)?;
         let fs = crankstart::file::FileSystem::get();
         let file = fs.open("readme.txt", crankstart_sys::FileOptions::kFileWrite)?;
         file.write("Put roms here".as_bytes())?;
@@ -28,11 +27,11 @@ impl<'a> State<'a> {
         let file = fs.open("pokemon.gb", crankstart_sys::FileOptions::kFileReadData)?;
         file.seek(0, crankstart::file::Whence::End)?;
         let size = file.tell()? as usize;
-        log_to_console!("file size is {size} bytes");
         file.seek(0, crankstart::file::Whence::Set)?;
-        let rom = Box::leak(Box::new(vec![0u8; size]));
-        file.read(rom)?;
-        log_to_console!("File is in ram");
+
+        let mut rom = vec![0u8; size];
+        file.read(&mut rom)?;
+
         let cartridge = Cartridge::new(rom).map_err(|e| anyhow::format_err!("{e:?}"))?;
 
         Ok(Box::new(Self {
@@ -41,7 +40,7 @@ impl<'a> State<'a> {
     }
 }
 
-impl<'a> Game for State<'a> {
+impl Game for State {
     fn update(&mut self, _playdate: &mut Playdate) -> Result<(), Error> {
         let mut state = rusty_boy::joypad::State::new();
 
@@ -71,7 +70,6 @@ impl<'a> Game for State<'a> {
 
         self.rusty_boy.update_keys(&state);
 
-        self.rusty_boy.run_until_next_frame(false);
         let frame = self.rusty_boy.run_until_next_frame(true);
 
         let graphics = Graphics::get();
