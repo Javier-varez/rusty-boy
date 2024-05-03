@@ -105,7 +105,7 @@ fn draw_surface_rgb888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()> 
 }
 
 fn attempt_restore_save_file(rusty_boy: &mut RustyBoy, rom_path: &Path) -> anyhow::Result<()> {
-    let save_file_path = rom_path.with_extension(".save");
+    let save_file_path = rom_path.with_extension("save");
 
     let data = match std::fs::read(&save_file_path) {
         Ok(data) => data,
