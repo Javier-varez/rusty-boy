@@ -188,7 +188,7 @@ impl Registers {
             0xFF44 => {}
             0xFF45 => self.lyc = value,
             0xFF46 => {
-                assert!(!self.dma_config.triggered);
+                debug_assert!(!self.dma_config.triggered);
                 self.dma_config.triggered = true;
                 self.dma_config.address = value;
             }

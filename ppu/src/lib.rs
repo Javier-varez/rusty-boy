@@ -18,7 +18,7 @@ use sm83::{
     core::Cycles,
     interrupts::{Interrupt, Interrupts},
 };
-use tock_registers::interfaces::{ReadWriteable, Readable};
+use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 use vram::Vram;
 
 use regs::STAT;
@@ -90,6 +90,8 @@ pub struct Ppu {
 
     mode: Mode,
     cycles: Cycles,
+    line: usize,
+
     stat_irq: bool,
 
     // Vector of indexes into OAM entries
@@ -99,34 +101,27 @@ pub struct Ppu {
     framebuffer: Box<Frame>,
 }
 
-const CYCLES_PER_FRAME: usize = 70224;
-
 const OAM_SCAN_LEN: usize = 80;
 const DRAWING_PIXELS_LEN: usize = 172;
 const HBLANK_LEN: usize = 204;
 const LINE_LENGTH: usize = OAM_SCAN_LEN + DRAWING_PIXELS_LEN + HBLANK_LEN;
+const NUM_LINES: usize = 154;
 const MAX_SELECTED_OBJECTS: usize = 10;
 const OBJ_OFFSET_Y: usize = 16;
 const OBJ_OFFSET_X: usize = 8;
 
-static_assertions::const_assert_eq!(CYCLES_PER_FRAME, LINE_LENGTH * 154);
+static_assertions::const_assert_eq!(70224, LINE_LENGTH * NUM_LINES);
 
-fn current_line(cycles: Cycles) -> usize {
-    let cycles: usize = cycles.into();
-    cycles / LINE_LENGTH
-}
-
-fn mode_for_current_cycle_count(cycles: Cycles) -> Mode {
+fn mode_for_current_cycle_count(line_cycles: Cycles, line: usize) -> Mode {
     // This is a simplified implementation that considers a fixed time mode 3.
-    let cycles: usize = cycles.into();
-    const VBLANK_START: usize = LINE_LENGTH * 144;
-    let line_offset = cycles % LINE_LENGTH;
+    let line_cycles: usize = line_cycles.into();
+    const VBLANK_START_LINE: usize = 144;
 
-    if cycles >= VBLANK_START {
+    if line >= VBLANK_START_LINE {
         Mode::Vblank
-    } else if line_offset < OAM_SCAN_LEN {
+    } else if line_cycles < OAM_SCAN_LEN {
         Mode::OamScan
-    } else if line_offset < (OAM_SCAN_LEN + DRAWING_PIXELS_LEN) {
+    } else if line_cycles < (OAM_SCAN_LEN + DRAWING_PIXELS_LEN) {
         Mode::DrawingPixels
     } else {
         Mode::Hblank
@@ -152,6 +147,8 @@ impl Ppu {
 
             mode: Mode::OamScan,
             cycles: Cycles::new(0),
+            line: 0,
+
             stat_irq: false,
             selected_oam_entries: heapless::Vec::new(),
             framebuffer: Box::new(unsafe { core::mem::transmute::<_, Frame>(framebuffer) }),
@@ -162,6 +159,17 @@ impl Ppu {
         self.mode
     }
 
+    pub fn update_line_and_cycles(&mut self, cycles: Cycles) {
+        self.cycles = self.cycles + cycles;
+        if self.cycles >= Cycles::new(LINE_LENGTH) {
+            self.cycles = self.cycles - Cycles::new(LINE_LENGTH);
+            self.line += 1;
+            if self.line >= NUM_LINES {
+                self.line = 0;
+            }
+        }
+    }
+
     /// Runs the PPU for the given number of cycles and then returns the PPU state
     pub fn step(
         &mut self,
@@ -169,16 +177,15 @@ impl Ppu {
         dma_engine: &mut DmaEngine,
         render: bool,
     ) -> (Interrupts, PpuResult) {
-        self.cycles = (self.cycles + cycles).wrap(CYCLES_PER_FRAME);
+        self.update_line_and_cycles(cycles);
 
-        let line = current_line(self.cycles);
-        let new_mode = mode_for_current_cycle_count(self.cycles);
+        let new_mode = mode_for_current_cycle_count(self.cycles, self.line);
 
         if self.regs.dma_config.triggered {
             dma_engine.trigger(self.regs.dma_config.address);
             self.regs.dma_config.triggered = false;
         }
-        let (interrupts, result) = self.step_inner(new_mode, line, render);
+        let (interrupts, result) = self.step_inner(new_mode, render);
         (interrupts | self.update_lcd_irq(), result)
     }
 
@@ -189,32 +196,33 @@ impl Ppu {
     fn update_lcd_irq(&mut self) -> Interrupts {
         let lyc_eq_ly = self.regs.status.read(STAT::LYC_INT_SELECT) != 0
             && self.regs.status.read(STAT::LYC_EQ_LY) != 0;
-        let mode0_irq =
-            self.regs.status.read(STAT::MODE_0_INT_SELECT) != 0 && self.mode == Mode::Hblank;
-        let mode1_irq =
-            self.regs.status.read(STAT::MODE_1_INT_SELECT) != 0 && self.mode == Mode::Vblank;
-        let mode2_irq =
-            self.regs.status.read(STAT::MODE_2_INT_SELECT) != 0 && self.mode == Mode::OamScan;
-        let status = lyc_eq_ly || mode0_irq || mode1_irq || mode2_irq;
+        let mode_irq = match self.mode {
+            Mode::Hblank => self.regs.status.read(STAT::MODE_0_INT_SELECT) != 0,
+            Mode::Vblank => self.regs.status.read(STAT::MODE_1_INT_SELECT) != 0,
+            Mode::OamScan => self.regs.status.read(STAT::MODE_2_INT_SELECT) != 0,
+            Mode::DrawingPixels => false,
+        };
+        let status = lyc_eq_ly || mode_irq;
 
-        if !self.stat_irq && status {
+        if status == self.stat_irq {
+            return Interrupts::new();
+        }
+
+        if status {
             self.stat_irq = true;
-            return Interrupt::Lcd.into();
-        }
-
-        if self.stat_irq && !status {
+            Interrupt::Lcd.into()
+        } else {
             self.stat_irq = false;
+            Interrupts::new()
         }
-
-        Interrupts::new()
     }
 
-    fn oam_scan(&mut self, line: usize) {
+    fn oam_scan(&mut self) {
         self.selected_oam_entries = heapless::Vec::new();
 
         let obj_height = (self.regs.lcdc.read(regs::LCDC::OBJ_SIZE) + 1) * 8;
 
-        let cur_obj_line = (line + OBJ_OFFSET_Y) as u8;
+        let cur_obj_line = (self.line + OBJ_OFFSET_Y) as u8;
         let is_object_relevant = |(_, object): &(usize, &oam::Object)| -> bool {
             cur_obj_line >= object.y && cur_obj_line < object.y + obj_height
         };
@@ -230,10 +238,10 @@ impl Ppu {
             .collect();
     }
 
-    fn step_inner(&mut self, new_mode: Mode, line: usize, render: bool) -> (Interrupts, PpuResult) {
+    fn step_inner(&mut self, new_mode: Mode, render: bool) -> (Interrupts, PpuResult) {
         const NO_IRQ: Interrupts = Interrupts::new();
         if self.mode == new_mode {
-            self.update_registers(line);
+            self.update_registers();
             return (NO_IRQ, PpuResult::InProgress(self.mode));
         }
 
@@ -241,27 +249,23 @@ impl Ppu {
 
         match self.mode {
             Mode::OamScan if render => {
-                self.oam_scan(line);
+                self.oam_scan();
             }
             Mode::DrawingPixels if render => {
-                self.draw_line(line);
+                self.draw_line();
             }
             Mode::Vblank => {
-                self.update_registers(line);
+                self.update_registers();
                 return (Interrupt::Vblank.into(), PpuResult::FrameComplete);
             }
             _ => {}
         }
 
-        self.update_registers(line);
+        self.update_registers();
         (NO_IRQ, PpuResult::InProgress(self.mode))
     }
 
-    fn draw_line_background(
-        &self,
-        line_idx: usize,
-        line: &mut [PaletteIndex; DISPLAY_WIDTH],
-    ) -> Palette {
+    fn draw_line_background(&self, line: &mut [PaletteIndex; DISPLAY_WIDTH]) -> Palette {
         let bg_win_enable = self.regs.lcdc.read(regs::LCDC::BG_AND_WINDOW_ENABLE) != 0;
         if !bg_win_enable {
             // BG is disabled
@@ -287,12 +291,12 @@ impl Ppu {
         let x_inner_offset = bg_x_offset % TILE_WIDTH;
         let x_tile_offset = bg_x_offset / TILE_WIDTH;
 
-        let tile_line_idx = (bg_y_offset + line_idx) % vram::TILE_HEIGHT;
+        let tile_line_idx = (bg_y_offset + self.line) % vram::TILE_HEIGHT;
 
         let background_pixels = self
             .vram
             .get_bg_tile_map(bg_tile_map)
-            .line(bg_y_offset + line_idx)
+            .line(bg_y_offset + self.line)
             .iter()
             .cycle()
             .skip(x_tile_offset)
@@ -315,18 +319,18 @@ impl Ppu {
         self.regs.bg_palette
     }
 
-    fn draw_line_window(&self, line_idx: usize, line: &mut [PaletteIndex; DISPLAY_WIDTH]) {
+    fn draw_line_window(&self, line: &mut [PaletteIndex; DISPLAY_WIDTH]) {
         let bg_win_enable = self.regs.lcdc.read(regs::LCDC::BG_AND_WINDOW_ENABLE) != 0;
         if !bg_win_enable {
             return;
         }
 
         let wy = self.regs.wy as usize;
-        if line_idx < wy {
+        if self.line < wy {
             // Nothing to draw, return
             return;
         }
-        let win_line = line_idx - wy;
+        let win_line = self.line - wy;
 
         let win_tile_map: crate::regs::LCDC::WINDOW_TILE_MAP::Value = self
             .regs
@@ -372,7 +376,6 @@ impl Ppu {
 
     fn draw_line_objects(
         &self,
-        line_idx: usize,
         bg_line: &[PaletteIndex; DISPLAY_WIDTH],
         line: &mut [Option<(usize, Color)>; DISPLAY_WIDTH],
     ) {
@@ -385,14 +388,14 @@ impl Ppu {
             let y_flip = object.attrs.read(oam::OBJ_ATTRS::Y_FLIP) != 0;
             let x_flip = object.attrs.read(oam::OBJ_ATTRS::X_FLIP) != 0;
 
-            let tile_line = OBJ_OFFSET_Y + line_idx - object.y as usize;
+            let tile_line = OBJ_OFFSET_Y + self.line - object.y as usize;
             let (tile_idx, tile_line) = if tile_line >= TILE_HEIGHT {
                 (object.tile_idx.next(), tile_line - TILE_HEIGHT)
             } else {
                 (object.tile_idx, tile_line)
             };
 
-            assert!(tile_line < TILE_HEIGHT);
+            debug_assert!(tile_line < TILE_HEIGHT);
             let tile_line = if y_flip {
                 TILE_HEIGHT - 1 - tile_line
             } else {
@@ -442,27 +445,27 @@ impl Ppu {
         }
     }
 
-    fn draw_line(&mut self, line_idx: usize) {
+    fn draw_line(&mut self) {
         if self.regs.lcdc.read(regs::LCDC::ENABLE) == 0 {
             return;
         }
 
         let mut line: [PaletteIndex; DISPLAY_WIDTH] = [PaletteIndex::Id0; DISPLAY_WIDTH];
 
-        let bg_palette = self.draw_line_background(line_idx, &mut line);
+        let bg_palette = self.draw_line_background(&mut line);
 
         if self.regs.lcdc.read(regs::LCDC::WINDOW_ENABLE) == 1 {
-            self.draw_line_window(line_idx, &mut line);
+            self.draw_line_window(&mut line);
         }
 
         // Either a selected (color, and x coordinate) or nothing
         let mut line_objs: [Option<(usize, Color)>; DISPLAY_WIDTH] = [None; DISPLAY_WIDTH];
 
         if self.regs.lcdc.read(regs::LCDC::OBJ_ENABLE) == 1 {
-            self.draw_line_objects(line_idx, &line, &mut line_objs);
+            self.draw_line_objects(&line, &mut line_objs);
         }
 
-        for ((pixel, bg_palette_idx), object_color) in self.framebuffer[line_idx]
+        for ((pixel, bg_palette_idx), object_color) in self.framebuffer[self.line]
             .iter_mut()
             .zip(line.iter())
             .zip(line_objs.iter())
@@ -475,8 +478,8 @@ impl Ppu {
         }
     }
 
-    fn update_registers(&mut self, line: usize) {
-        let line = line as u8;
+    fn update_registers(&mut self) {
+        let line = self.line as u8;
         self.regs.ly = line;
         self.regs.status.modify(
             regs::STAT::PPU_MODE.val(self.mode as u8)
