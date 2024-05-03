@@ -8,13 +8,14 @@ use crate::memory::GbAddressSpace;
 
 use cartridge::Cartridge;
 use ppu::{dma::DmaEngine, Color, PpuResult, DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use sm83::core::Cpu;
+use sm83::core::{Cpu, Cycles};
 
 pub struct RustyBoy {
     cpu: Cpu,
     dma_engine: DmaEngine,
     address_space: GbAddressSpace,
     debug: bool,
+    cycle_step: Cycles,
 }
 
 impl RustyBoy {
@@ -29,11 +30,19 @@ impl RustyBoy {
             cpu,
             dma_engine: DmaEngine::new(),
             address_space: GbAddressSpace::new(cartridge),
+            cycle_step: Cycles::new(4), // Default cycle step for maximum accuracy
         }
     }
 
     pub fn enable_debug(&mut self) {
         self.debug = true;
+    }
+
+    /// Configures the number of cycles that the CPU runs before updating other peripherals.
+    /// This makes the emulation less accurate, so be careful when using it, as it introduces
+    /// jitter in operations around the CPU and reduces cycle accuracy.
+    pub fn configure_cpu_step(&mut self, cycles: Cycles) {
+        self.cycle_step = cycles;
     }
 
     pub fn supports_battery_backed_ram(&mut self) -> bool {
@@ -51,31 +60,37 @@ impl RustyBoy {
     }
 
     fn step(&mut self, render: bool) -> PpuResult {
-        if self.debug {
-            let pc = self.cpu.get_regs().pc_reg;
-            let inst = disassembler::disassemble_single_inst(&mut self.address_space, pc);
-            let regs = self.cpu.get_regs();
-            log::trace!("{pc:#04x} {inst} -- {regs:x?}");
+        // Run a bunch of CPU cycles at once. This is technically potentially incorrect, but saves a lot of
+        // emulation time
+        let mut cycles = Cycles::new(0);
+        while cycles < self.cycle_step {
+            if self.debug {
+                let pc = self.cpu.get_regs().pc_reg;
+                let inst = disassembler::disassemble_single_inst(&mut self.address_space, pc);
+                let regs = self.cpu.get_regs();
+                log::trace!("{pc:#04x} {inst} -- {regs:x?}");
+            }
+
+            let interrupts = self.address_space.interrupt_regs.active_interrupts();
+            let result = self.cpu.step(&mut self.address_space, interrupts);
+
+            cycles = cycles
+                + match result {
+                    sm83::core::ExitReason::Step(cycles)
+                    | sm83::core::ExitReason::Stop(cycles)
+                    | sm83::core::ExitReason::Halt(cycles) => cycles,
+                    sm83::core::ExitReason::InterruptTaken(cycles, interrupt) => {
+                        self.address_space.interrupt_regs.acknowledge(interrupt);
+                        cycles
+                    }
+                    sm83::core::ExitReason::IllegalOpcode => {
+                        panic!(
+                            "Illegal CPU opcode at address: {}",
+                            self.cpu.get_regs().pc_reg
+                        )
+                    }
+                };
         }
-
-        let interrupts = self.address_space.interrupt_regs.active_interrupts();
-        let result = self.cpu.step(&mut self.address_space, interrupts);
-
-        let cycles = match result {
-            sm83::core::ExitReason::Step(cycles)
-            | sm83::core::ExitReason::Stop(cycles)
-            | sm83::core::ExitReason::Halt(cycles) => cycles,
-            sm83::core::ExitReason::InterruptTaken(cycles, interrupt) => {
-                self.address_space.interrupt_regs.acknowledge(interrupt);
-                cycles
-            }
-            sm83::core::ExitReason::IllegalOpcode => {
-                panic!(
-                    "Illegal CPU opcode at address: {}",
-                    self.cpu.get_regs().pc_reg
-                )
-            }
-        };
 
         let (ppu_interrupts, ppu_result) =
             self.address_space
