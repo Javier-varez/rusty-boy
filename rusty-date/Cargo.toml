@@ -12,14 +12,18 @@ panic_immediate_abort = false
 crate-type = ["staticlib", "cdylib"]
 
 [profile.dev]
+debug = 1
+codegen-units = 1
 panic = "abort"
 opt-level = 3
-lto = true
+lto = "fat"
 
 [profile.release]
+debug = 1
+codegen-units = 1
 panic = "abort"
 opt-level = 3
-lto = true
+lto = "fat"
 
 [dependencies]
 crankstart = { git = "https://github.com/pd-rs/crankstart" }
