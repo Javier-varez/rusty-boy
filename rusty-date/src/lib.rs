@@ -33,10 +33,9 @@ impl State {
         file.read(&mut rom)?;
 
         let cartridge = Cartridge::new(rom).map_err(|e| anyhow::format_err!("{e:?}"))?;
-
-        Ok(Box::new(Self {
-            rusty_boy: RustyBoy::new_with_cartridge(cartridge),
-        }))
+        let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge);
+        rusty_boy.configure_cpu_step(sm83::core::Cycles::new(60));
+        Ok(Box::new(Self { rusty_boy }))
     }
 }
 
@@ -70,6 +69,7 @@ impl Game for State {
 
         self.rusty_boy.update_keys(&state);
 
+        self.rusty_boy.run_until_next_frame(false);
         let frame = self.rusty_boy.run_until_next_frame(true);
 
         let graphics = Graphics::get();

@@ -18,7 +18,7 @@ use sm83::{
     core::Cycles,
     interrupts::{Interrupt, Interrupts},
 };
-use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
+use tock_registers::interfaces::{ReadWriteable, Readable};
 use vram::Vram;
 
 use regs::STAT;

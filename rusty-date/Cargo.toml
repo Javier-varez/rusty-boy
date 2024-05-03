@@ -33,6 +33,7 @@ euclid = { version = "0.22.9", default-features = false, features = [ "libm" ] }
 rusty-boy = { path = "../rusty-boy" }
 cartridge = { path = "../cartridge" }
 ppu = { path = "../ppu" }
+sm83 = { path = "../sm83" }
 
 [dependencies.cstr_core]
 version = "=0.1.2"
