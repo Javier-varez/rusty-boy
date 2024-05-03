@@ -32,7 +32,7 @@ fn save_png(idx: usize, frame: &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]) -> any
     const MAX: u8 = 255;
     let frame: Vec<u8> = frame
         .into_iter()
-        .map(|l| {
+        .flat_map(|l| {
             l.into_iter().map(|c| match c {
                 Color::White => MAX,
                 Color::LightGrey => MAX / 3 * 2,
@@ -40,7 +40,6 @@ fn save_png(idx: usize, frame: &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]) -> any
                 Color::Black => 0,
             })
         })
-        .flatten()
         .collect();
 
     let file = std::fs::File::create(&path)?;
@@ -63,7 +62,7 @@ pub fn sleep_until(deadline: Instant) {
 }
 
 fn draw_surface_argb8888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()> {
-    let pixel_iter = frame.iter().map(|l| l.iter()).flatten();
+    let pixel_iter = frame.iter().flat_map(|l| l.iter());
 
     // The size of each ARGB8888 pixel is 4 bytes
     const PIXEL_SIZE: usize = 4;
@@ -85,7 +84,7 @@ fn draw_surface_argb8888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()
 }
 
 fn draw_surface_rgb888(surface: &mut [u8], frame: &Frame) -> anyhow::Result<()> {
-    let pixel_iter = frame.iter().map(|l| l.iter()).flatten();
+    let pixel_iter = frame.iter().flat_map(|l| l.iter());
 
     // The size of each RGB888 pixel is 4 bytes, last one is unused...
     const PIXEL_SIZE: usize = 4;

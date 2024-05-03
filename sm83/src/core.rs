@@ -96,19 +96,19 @@ impl Registers {
 }
 
 const fn carry_bit8(a: u8, b: u8, c: u8, bit: usize) -> bool {
-    assert!(bit < 8);
+    debug_assert!(bit < 8);
     let xor = a ^ b ^ c;
     (xor & (1 << bit)) != 0
 }
 
 const fn carry_bit16(a: u16, b: u16, c: u16, bit: usize) -> bool {
-    assert!(bit < 16);
+    debug_assert!(bit < 16);
     let xor = a ^ b ^ c;
     (xor & (1 << bit)) != 0
 }
 
 const fn carry_bit32(a: u32, b: u32, c: u32, bit: usize) -> bool {
-    assert!(bit < 32);
+    debug_assert!(bit < 32);
     let xor = a ^ b ^ c;
     (xor & (1 << bit)) != 0
 }
