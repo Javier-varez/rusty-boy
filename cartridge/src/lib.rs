@@ -5,6 +5,7 @@ pub mod mappers;
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use header::CartridgeHeader;
 use mappers::Mapper;
@@ -24,12 +25,12 @@ impl core::fmt::Display for Error {
 }
 
 pub struct Cartridge {
-    mapper: Mapper,
+    mapper: Box<dyn Mapper>,
 }
 
 impl Cartridge {
     pub fn new(rom_data: Vec<u8>) -> Result<Self, header::Error> {
-        let mapper = Mapper::new(rom_data)?;
+        let mapper = mappers::new_mapper(rom_data)?;
         Ok(Self { mapper })
     }
 

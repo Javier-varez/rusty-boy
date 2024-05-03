@@ -4,6 +4,8 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
+use super::Mapper;
+
 pub struct RomOnly {
     data: Vec<u8>,
 }
@@ -12,12 +14,14 @@ impl RomOnly {
     pub fn new(data: Vec<u8>) -> Self {
         Self { data }
     }
+}
 
-    pub fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
+impl Mapper for RomOnly {
+    fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
         CartridgeHeader::new(&self.data)
     }
 
-    pub fn read(&self, address: sm83::memory::Address) -> u8 {
+    fn read(&self, address: sm83::memory::Address) -> u8 {
         if (address as usize) < self.data.len() {
             self.data[address as usize]
         } else {
@@ -26,5 +30,5 @@ impl RomOnly {
     }
 
     // Writes are ignored
-    pub fn write(&mut self, _: sm83::memory::Address, _: u8) {}
+    fn write(&mut self, _: sm83::memory::Address, _: u8) {}
 }

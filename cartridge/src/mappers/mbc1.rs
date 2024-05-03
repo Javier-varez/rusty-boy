@@ -5,6 +5,8 @@ extern crate alloc;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use super::Mapper;
+
 const ROM_BANK_SIZE: usize = 16 * 1024;
 const ROM_BANK_SELECT_MASK: usize = 0x1F;
 
@@ -45,10 +47,6 @@ impl Mbc1 {
         }
     }
 
-    pub fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
-        CartridgeHeader::new(&self.rom)
-    }
-
     fn read_rom(&self, address: usize) -> u8 {
         // Banks that don't exist need to read the wrapped address value.
         // TODO: This mod operation is in a hot path, move it to bank selection
@@ -70,8 +68,14 @@ impl Mbc1 {
             self.ram[address] = value
         }
     }
+}
 
-    pub fn read(&self, address: sm83::memory::Address) -> u8 {
+impl Mapper for Mbc1 {
+    fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
+        CartridgeHeader::new(&self.rom)
+    }
+
+    fn read(&self, address: sm83::memory::Address) -> u8 {
         match address {
             0x0000..=0x3FFF => {
                 // ROM bank 0 (16 KiB)
@@ -99,7 +103,7 @@ impl Mbc1 {
         }
     }
 
-    pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
+    fn write(&mut self, address: sm83::memory::Address, value: u8) {
         match address {
             0x0000..=0x1FFF => {
                 // Ram is enabled if lower nibble is A
@@ -141,11 +145,11 @@ impl Mbc1 {
         }
     }
 
-    pub fn ram(&self) -> &[u8] {
-        &self.ram
+    fn battery_backed_ram(&self) -> Option<&[u8]> {
+        Some(&self.ram)
     }
 
-    pub fn restore_ram(&mut self, ram: &[u8]) -> Result<(), crate::Error> {
+    fn restore_battery_backed_ram(&mut self, ram: &[u8]) -> Result<(), crate::Error> {
         if ram.len() != self.ram.len() {
             return Err(crate::Error::UnexpectedRamSize {
                 expected: self.ram.len(),
