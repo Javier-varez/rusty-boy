@@ -19,17 +19,9 @@ use {
     crankstart_sys::{LCD_COLUMNS, LCD_ROWS},
 };
 
-fn read_file_size(fs: &FileSystem, name: &str) -> Result<usize, anyhow::Error> {
-    let file = fs.open(name, crankstart_sys::FileOptions::kFileReadData)?;
-    file.seek(0, crankstart::file::Whence::End)?;
-    let size = file.tell()? as usize;
-    file.seek(0, crankstart::file::Whence::Set)?;
-    Ok(size)
-}
-
 fn load_file(fs: &FileSystem, name: &str) -> Result<Rom, anyhow::Error> {
-    let size = read_file_size(fs, name)?;
-    let mut data = vec![0; size];
+    let stat = fs.stat(name)?;
+    let mut data = vec![0; stat.size as usize];
     let file = fs.open(name, crankstart_sys::FileOptions::kFileReadData)?;
     file.read(&mut data)?;
     Ok(Rom {

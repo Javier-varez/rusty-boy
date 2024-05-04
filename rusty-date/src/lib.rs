@@ -65,7 +65,7 @@ impl Game for State {
                 &FileSystem::get(),
                 &Graphics::get(),
                 &System::get(),
-                rom.data,
+                rom,
             )?);
         } else if terminate_game {
             self.view = View::GameSelector(GameSelector::new(&self.font)?);
