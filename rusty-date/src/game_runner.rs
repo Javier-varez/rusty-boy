@@ -4,6 +4,10 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use alloc::string::ToString;
 use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
+use crankstart::geometry::ScreenRect;
+use crankstart::graphics::LCDColor;
+use crankstart_sys::LCDSolidColor;
+use euclid::{Point2D, Size2D};
 use ppu::Frame;
 
 use {
@@ -71,28 +75,45 @@ fn save_game(fs: &FileSystem, name: &str, data: &[u8]) -> Result<(), anyhow::Err
 fn render_frame(graphics: &Graphics, frame: &Frame) -> Result<(), anyhow::Error> {
     let target = graphics.get_frame()?;
 
-    let x_offset = (LCD_COLUMNS as usize - 160) / 2;
-    let y_offset = (LCD_ROWS as usize - 144) / 2;
+    const TARGET_WIDTH: usize =
+        ((LCD_ROWS as f64) * (ppu::DISPLAY_WIDTH as f64) / (ppu::DISPLAY_HEIGHT as f64)) as usize;
+    const TARGET_HEIGHT: usize = LCD_ROWS as usize;
 
-    for (y, line) in frame.iter().enumerate() {
-        let target_line_offset = (y_offset + y) * LCD_ROWSIZE as usize;
-        let mut byte = 0;
-        for (x, pixel) in line.iter().enumerate() {
-            match *pixel {
-                ppu::Color::White | ppu::Color::LightGrey => {
-                    byte |= 1 << (7 - (x % 8));
-                }
-                _ => {}
-            }
+    let x_offset = (LCD_COLUMNS as usize - TARGET_WIDTH) / 2;
+    let y_offset = (LCD_ROWS as usize - TARGET_HEIGHT) / 2;
 
-            if x % 8 == 7 {
-                target[target_line_offset + (x_offset + x) / 8] = byte;
-                byte = 0;
-            }
+    graphics.fill_rect(
+        ScreenRect {
+            origin: Point2D::new(x_offset as i32, y_offset as i32),
+            size: Size2D::new(TARGET_WIDTH as i32, TARGET_HEIGHT as i32),
+        },
+        LCDColor::Solid(LCDSolidColor::kColorBlack),
+    )?;
+
+    for y in y_offset..(y_offset + TARGET_HEIGHT) {
+        let ppu_y = ((y - y_offset) * ppu::DISPLAY_HEIGHT + (TARGET_HEIGHT / 2)) / TARGET_HEIGHT;
+        let ppu_line = &frame[ppu_y];
+        for x in x_offset..(x_offset + TARGET_WIDTH) {
+            let ppu_x = ((x - x_offset) * ppu::DISPLAY_WIDTH + (TARGET_WIDTH / 2)) / TARGET_WIDTH;
+            let pixel = ppu_line[ppu_x];
+
+            let on = match pixel {
+                ppu::Color::White => 1,
+                ppu::Color::LightGrey if ((y & 1) != 0) || ((x & 1) != 0) => 1,
+                ppu::Color::LightGrey => 0,
+                ppu::Color::DarkGrey if ((y & 1) != 0) || ((x & 1) != 0) => 0,
+                ppu::Color::DarkGrey => 1,
+                ppu::Color::Black => 0,
+            };
+
+            let target_offset = (y * LCD_ROWSIZE as usize) + x / 8;
+            let target_bit = 7 - (x % 8);
+
+            target[target_offset] |= on << target_bit;
         }
     }
 
-    graphics.mark_updated_rows((y_offset as i32)..=(y_offset + 144) as i32)?;
+    graphics.mark_updated_rows((y_offset as i32)..=(y_offset + TARGET_HEIGHT) as i32)?;
     Ok(())
 }
 
