@@ -1,104 +1,76 @@
 #![no_std]
 
+mod game_runner;
+mod game_selector;
+
 extern crate alloc;
 
-use cartridge::Cartridge;
-use crankstart_sys::PDButtons;
-use rusty_boy::RustyBoy;
 use {
-    alloc::{boxed::Box, vec},
-    anyhow::Error,
-    crankstart::{crankstart_game, graphics::Graphics, system::System, Game, Playdate},
-    crankstart_sys::{LCD_COLUMNS, LCD_ROWS, LCD_ROWSIZE},
+    alloc::boxed::Box,
+    crankstart::{
+        crankstart_game,
+        file::FileSystem,
+        graphics::{Font, Graphics},
+        system::System,
+        Game, Playdate,
+    },
+    game_runner::GameRunner,
+    game_selector::GameSelector,
 };
 
+const SYSTEM_FONT: &str = "/System/Fonts/Asheville-Sans-14-Bold.pft";
+const TEXT_HEIGHT: i32 = 16;
+
+enum View {
+    GameRunner(game_runner::GameRunner),
+    GameSelector(game_selector::GameSelector),
+}
+
 struct State {
-    rusty_boy: RustyBoy,
+    view: View,
+    font: Font,
 }
 
 impl State {
-    pub fn new(_playdate: &Playdate) -> Result<Box<Self>, Error> {
-        crankstart::display::Display::get().set_refresh_rate(30.0)?;
-        let fs = crankstart::file::FileSystem::get();
-        let file = fs.open("readme.txt", crankstart_sys::FileOptions::kFileWrite)?;
-        file.write("Put roms here".as_bytes())?;
-        drop(file);
+    pub fn new(_playdate: &Playdate) -> Result<Box<Self>, anyhow::Error> {
+        let display = crankstart::display::Display::get();
+        display.set_refresh_rate(30.0)?;
 
-        let file = fs.open("pokemon.gb", crankstart_sys::FileOptions::kFileReadData)?;
-        file.seek(0, crankstart::file::Whence::End)?;
-        let size = file.tell()? as usize;
-        file.seek(0, crankstart::file::Whence::Set)?;
+        let graphics = crankstart::graphics::Graphics::get();
+        let font = graphics.load_font(SYSTEM_FONT)?;
+        graphics.set_font(&font)?;
 
-        let mut rom = vec![0u8; size];
-        file.read(&mut rom)?;
-
-        let cartridge = Cartridge::new(rom).map_err(|e| anyhow::format_err!("{e:?}"))?;
-        let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge);
-        rusty_boy.configure_cpu_step(sm83::core::Cycles::new(60));
-        Ok(Box::new(Self { rusty_boy }))
+        Ok(Box::new(Self {
+            view: View::GameSelector(GameSelector::new(&font)?),
+            font,
+        }))
     }
 }
 
 impl Game for State {
-    fn update(&mut self, _playdate: &mut Playdate) -> Result<(), Error> {
-        let mut state = rusty_boy::joypad::State::new();
-
-        let (current, _, _) = System::get().get_button_state()?;
-        if (current & PDButtons::kButtonA).0 != 0 {
-            state.a = true;
-        }
-        if (current & PDButtons::kButtonB).0 != 0 {
-            state.b = true;
-        }
-        if (current & PDButtons::kButtonLeft).0 != 0 {
-            state.left = true;
-        }
-        if (current & PDButtons::kButtonRight).0 != 0 {
-            state.right = true;
-        }
-        if (current & PDButtons::kButtonUp).0 != 0 {
-            state.up = true;
-        }
-        if (current & PDButtons::kButtonDown).0 != 0 {
-            state.down = true;
-        }
-        let crank = System::get().is_crank_docked()?;
-        if crank {
-            state.start = true;
-        }
-
-        self.rusty_boy.update_keys(&state);
-
-        self.rusty_boy.run_until_next_frame(false);
-        let frame = self.rusty_boy.run_until_next_frame(true);
-
-        let graphics = Graphics::get();
-        let target = graphics.get_frame()?;
-
-        let x_offset = (LCD_COLUMNS as usize - 160) / 2;
-        let y_offset = (LCD_ROWS as usize - 144) / 2;
-
-        for (y, line) in frame.iter().enumerate() {
-            let target_line_offset = (y_offset + y) * LCD_ROWSIZE as usize;
-            let mut byte = 0;
-            for (x, pixel) in line.iter().enumerate() {
-                match *pixel {
-                    ppu::Color::White | ppu::Color::LightGrey => {
-                        byte |= 1 << (7 - (x % 8));
-                    }
-                    _ => {}
-                }
-
-                if x % 8 == 7 {
-                    target[target_line_offset + (x_offset + x) / 8] = byte;
-                    byte = 0;
-                }
+    fn update(&mut self, _playdate: &mut Playdate) -> Result<(), anyhow::Error> {
+        let mut selected_rom = None;
+        let mut terminate_game = false;
+        match &mut self.view {
+            View::GameSelector(selector) => {
+                selected_rom = selector.update(&self.font)?;
+            }
+            View::GameRunner(runner) => {
+                terminate_game = runner.update()?;
             }
         }
 
-        graphics.mark_updated_rows((y_offset as i32)..=(y_offset + 144) as i32)?;
+        if let Some(rom) = selected_rom {
+            self.view = View::GameRunner(GameRunner::new(
+                &FileSystem::get(),
+                &Graphics::get(),
+                &System::get(),
+                rom.data,
+            )?);
+        } else if terminate_game {
+            self.view = View::GameSelector(GameSelector::new(&self.font)?);
+        }
 
-        System::get().draw_fps(0, 0)?;
         Ok(())
     }
 }
