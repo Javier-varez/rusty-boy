@@ -6,7 +6,7 @@ mod game_selector;
 extern crate alloc;
 
 use {
-    alloc::boxed::Box,
+    alloc::{boxed::Box, format},
     crankstart::{
         crankstart_game,
         file::FileSystem,
@@ -14,6 +14,7 @@ use {
         system::System,
         Game, Playdate,
     },
+    crankstart_sys::PDSystemEvent,
     game_runner::GameRunner,
     game_selector::GameSelector,
 };
@@ -71,6 +72,23 @@ impl Game for State {
             self.view = View::GameSelector(GameSelector::new(&self.font)?);
         }
 
+        Ok(())
+    }
+
+    fn handle_event(
+        &mut self,
+        _playdate: &mut Playdate,
+        event: PDSystemEvent,
+    ) -> Result<(), anyhow::Error> {
+        System::log_to_console(&format!("{event:?}"));
+        if event == PDSystemEvent::kEventTerminate || event == PDSystemEvent::kEventLock {
+            match &mut self.view {
+                View::GameRunner(runner) => {
+                    runner.save_game()?;
+                }
+                View::GameSelector(_) => {}
+            }
+        }
         Ok(())
     }
 }

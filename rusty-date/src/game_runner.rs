@@ -2,7 +2,6 @@ extern crate alloc;
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use alloc::string::ToString;
 use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
 use crankstart::geometry::ScreenRect;
 use crankstart::graphics::LCDColor;
@@ -24,30 +23,29 @@ use rusty_boy::RustyBoy;
 
 const DUMMY_BUTTON_CYCLES: usize = 30;
 
-static BUTTON_PRESS: AtomicBool = AtomicBool::new(false);
-static SAVE_GAME: AtomicBool = AtomicBool::new(false);
 static TERMINATE: AtomicBool = AtomicBool::new(false);
+static SELECT_BUTTON: AtomicBool = AtomicBool::new(false);
+static START_BUTTON: AtomicBool = AtomicBool::new(false);
 
 struct MenuItems {
-    buttons: MenuItem,
-    _save: MenuItem,
     _choose: MenuItem,
+    _select_button: MenuItem,
+    _start_button: MenuItem,
 }
 
 fn setup_menu_items(system: &System) -> Result<MenuItems, anyhow::Error> {
     Ok(MenuItems {
-        buttons: system.add_options_menu_item(
-            "buttons",
-            vec!["Start".to_string(), "Select".to_string()],
-            Box::new(|| BUTTON_PRESS.store(true, Ordering::Relaxed)),
-        )?,
-        _save: system.add_menu_item(
-            "save game",
-            Box::new(|| SAVE_GAME.store(true, Ordering::Relaxed)),
-        )?,
         _choose: system.add_menu_item(
             "choose game",
             Box::new(|| TERMINATE.store(true, Ordering::Relaxed)),
+        )?,
+        _select_button: system.add_menu_item(
+            "select",
+            Box::new(|| SELECT_BUTTON.store(true, Ordering::Relaxed)),
+        )?,
+        _start_button: system.add_menu_item(
+            "start",
+            Box::new(|| START_BUTTON.store(true, Ordering::Relaxed)),
         )?,
     })
 }
@@ -122,7 +120,7 @@ pub struct GameRunner {
     rusty_boy: RustyBoy,
     select_cycles: usize,
     start_cycles: usize,
-    menu_items: MenuItems,
+    _menu_items: MenuItems,
 }
 
 impl GameRunner {
@@ -146,8 +144,8 @@ impl GameRunner {
             crankstart_sys::LCDSolidColor::kColorBlack,
         ))?;
 
-        BUTTON_PRESS.store(false, Ordering::Relaxed);
-        SAVE_GAME.store(false, Ordering::Relaxed);
+        SELECT_BUTTON.store(false, Ordering::Relaxed);
+        START_BUTTON.store(false, Ordering::Relaxed);
         TERMINATE.store(false, Ordering::Relaxed);
         let menu_items = setup_menu_items(system)?;
 
@@ -156,34 +154,31 @@ impl GameRunner {
             rusty_boy,
             select_cycles: 0,
             start_cycles: 0,
-            menu_items,
+            _menu_items: menu_items,
         })
+    }
+
+    pub fn save_game(&mut self) -> Result<(), anyhow::Error> {
+        if self.rusty_boy.supports_battery_backed_ram() {
+            if let Some(ram) = self.rusty_boy.get_cartridge_ram() {
+                System::log_to_console("Game was saved");
+                save_game(&FileSystem::get(), &self.game, ram)?;
+            }
+        }
+        Ok(())
     }
 
     pub fn update(&mut self) -> Result<bool, anyhow::Error> {
         if TERMINATE.load(Ordering::Relaxed) {
-            if self.rusty_boy.supports_battery_backed_ram() {
-                if let Some(ram) = self.rusty_boy.get_cartridge_ram() {
-                    save_game(&FileSystem::get(), &self.game, ram)?;
-                }
-            }
+            self.save_game()?;
             return Ok(true);
         }
 
-        if SAVE_GAME.swap(false, Ordering::Relaxed) && self.rusty_boy.supports_battery_backed_ram()
-        {
-            if let Some(ram) = self.rusty_boy.get_cartridge_ram() {
-                save_game(&FileSystem::get(), &self.game, ram)?;
-            }
+        if SELECT_BUTTON.swap(false, Ordering::Relaxed) {
+            self.select_cycles = DUMMY_BUTTON_CYCLES;
         }
-
-        if BUTTON_PRESS.swap(false, Ordering::Relaxed) {
-            let idx = System::get().get_menu_item_value(&self.menu_items.buttons)?;
-            match idx {
-                0 => self.start_cycles = DUMMY_BUTTON_CYCLES,
-                1 => self.select_cycles = DUMMY_BUTTON_CYCLES,
-                _ => {}
-            };
+        if START_BUTTON.swap(false, Ordering::Relaxed) {
+            self.start_cycles = DUMMY_BUTTON_CYCLES;
         }
 
         let mut joypad_state = rusty_boy::joypad::State::new();

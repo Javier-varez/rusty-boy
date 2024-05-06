@@ -60,7 +60,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "crankstart"
 version = "0.1.2"
-source = "git+https://github.com/pd-rs/crankstart#64391611b5356f3ee9761511a65cf4a681f19e76"
+source = "git+https://github.com/javier-varez/crankstart#f1566c2008f75e649474b622918eb4dd297498cd"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -73,7 +73,7 @@ dependencies = [
 [[package]]
 name = "crankstart-sys"
 version = "0.1.2"
-source = "git+https://github.com/pd-rs/crankstart#64391611b5356f3ee9761511a65cf4a681f19e76"
+source = "git+https://github.com/javier-varez/crankstart#f1566c2008f75e649474b622918eb4dd297498cd"
 dependencies = [
  "euclid",
 ]
@@ -214,7 +214,6 @@ dependencies = [
  "cartridge",
  "crankstart",
  "crankstart-sys",
- "cstr_core",
  "euclid",
  "ppu",
  "rusty-boy",
