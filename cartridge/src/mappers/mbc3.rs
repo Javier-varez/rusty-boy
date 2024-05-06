@@ -38,24 +38,16 @@ impl Mbc3 {
 
     fn read_rom(&self, address: usize) -> u8 {
         // Banks that don't exist need to read the wrapped address value.
-        // TODO: This mod operation is in a hot path, move it to bank selection
-        //       or make sure it is always implemented as a shift
-        let address = address % self.rom.len();
+        let address = address & (self.rom.len() - 1);
         self.rom[address]
     }
 
     fn read_ram(&self, address: usize) -> u8 {
-        if address < self.ram.len() {
-            self.ram[address]
-        } else {
-            0xff
-        }
+        self.ram[address]
     }
 
     fn write_ram(&mut self, address: usize, value: u8) {
-        if address < self.ram.len() {
-            self.ram[address] = value
-        }
+        self.ram[address] = value
     }
 }
 
@@ -72,10 +64,7 @@ impl Mapper for Mbc3 {
             }
             0x4000..=0x7FFF => {
                 // ROM bank 1 to 0x7F (16 KiB each)
-                debug_assert!(self.selected_rom_bank < 0x80);
-                debug_assert_ne!(self.selected_rom_bank, 0);
-                let address = (self.selected_rom_bank - 1) * ROM_BANK_SIZE + address as usize;
-                self.read_rom(address)
+                self.read_rom((self.selected_rom_bank - 1) * ROM_BANK_SIZE + address as usize)
             }
             0xA000..=0xBFFF => {
                 // RAM bank

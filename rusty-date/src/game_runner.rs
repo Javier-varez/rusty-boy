@@ -143,7 +143,7 @@ impl GameRunner {
         };
 
         graphics.clear(crankstart::graphics::LCDColor::Solid(
-            crankstart_sys::LCDSolidColor::kColorWhite,
+            crankstart_sys::LCDSolidColor::kColorBlack,
         ))?;
 
         BUTTON_PRESS.store(false, Ordering::Relaxed);
