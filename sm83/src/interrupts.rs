@@ -1,3 +1,5 @@
+//! Abstractions for CPU interrupts.
+
 /// The set of memory-mapped interrupt registers
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct InterruptRegs {
@@ -19,14 +21,18 @@ impl InterruptRegs {
         self.enable_reg & self.flags_reg
     }
 
+    /// Acknowledges the given interrupt
     pub fn acknowledge(&mut self, interrupt: Interrupt) {
         self.flags_reg = self.flags_reg.acknowledge(interrupt);
     }
 
+    /// Triggers the given interrupt
     pub fn trigger(&mut self, interrupts: Interrupts) {
         self.flags_reg = self.flags_reg | interrupts;
     }
 
+    /// Reads the interrupt registers. Interrupt enable register (`0xFFFF`) and Interrupt flags
+    /// register (`0xFF0F`)
     pub fn read(&self, address: crate::memory::Address) -> u8 {
         match address {
             0xFFFF => self.enable_reg.into(),
@@ -37,6 +43,8 @@ impl InterruptRegs {
         }
     }
 
+    /// Writes the interrupt registers. Interrupt enable register (`0xFFFF`) and Interrupt flags
+    /// register (`0xFF0F`)
     pub fn write(&mut self, address: crate::memory::Address, value: u8) {
         let value = Interrupts(value) & ALL_INTERRUPTS;
         match address {
@@ -53,10 +61,15 @@ impl InterruptRegs {
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Interrupt {
+    /// Interrupt triggered when the LCD enters VBLANK.
     Vblank = 0x01,
+    /// LCD interrupt. Configurable to trigger on specific lines or on entry to a specific mode.
     Lcd = 0x02,
+    /// Timer interrupt
     Timer = 0x04,
+    /// Serial port interrupt
     Serial = 0x08,
+    /// Joypad interrupt
     Joypad = 0x10,
 }
 
@@ -120,10 +133,12 @@ impl Default for Interrupts {
 }
 
 impl Interrupts {
+    /// Constructs a set of inactive interrupts
     pub const fn new() -> Self {
         Self(0)
     }
 
+    /// Returns the interrupt with the highest priority out of all active interrupts (if any)
     pub fn highest_priority(self) -> Option<Interrupt> {
         let trailing_zeros = self.0.trailing_zeros();
         match trailing_zeros {
@@ -136,11 +151,13 @@ impl Interrupts {
         }
     }
 
+    /// Acknowledges the given interrupt
     pub fn acknowledge(self, other: Interrupt) -> Self {
         let other: Interrupts = other.into();
         self & !other
     }
 
+    /// Returns true if any interrupt is active
     pub fn has_any(self) -> bool {
         self.0 != 0
     }

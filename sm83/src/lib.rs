@@ -1,3 +1,4 @@
+//! Implementation of an SM83 CPU emulator, used in the Game Boy.
 #![no_std]
 
 pub mod core;
