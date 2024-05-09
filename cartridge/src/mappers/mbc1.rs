@@ -72,7 +72,7 @@ impl Mbc1 {
 
 impl Mapper for Mbc1 {
     fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
-        CartridgeHeader::new(&self.rom)
+        CartridgeHeader::try_new(&self.rom)
     }
 
     fn read(&self, address: sm83::memory::Address) -> u8 {

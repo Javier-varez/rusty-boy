@@ -18,7 +18,7 @@ impl RomOnly {
 
 impl Mapper for RomOnly {
     fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
-        CartridgeHeader::new(&self.data)
+        CartridgeHeader::try_new(&self.data)
     }
 
     fn read(&self, address: sm83::memory::Address) -> u8 {

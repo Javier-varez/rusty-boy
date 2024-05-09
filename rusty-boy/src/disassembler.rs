@@ -31,7 +31,7 @@ impl<'a> Disassembler<'a> {
     }
 
     pub fn header(&'a self) -> Result<CartridgeHeader<'a>, Error> {
-        Ok(CartridgeHeader::new(self.data)?)
+        Ok(CartridgeHeader::try_new(self.data)?)
     }
 
     pub fn entrypoint(&'a self) -> Result<InstructionIter<Cloned<Iter<'a, u8>>>, Error> {

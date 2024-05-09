@@ -1,19 +1,35 @@
+//! The cartridge header provides information about the game. It is always located at address
+//! 0x150 and determines the type of mapper IC used by the cartridge, the size of the ROM, size of
+//! the RAM (if any) and the title of the game, among other data.
+
+/// The licensee of the game
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Licensee {
+    /// Uses the old cartridge format
     Old(u8),
+    /// Uses the new cartridge format
     New([u8; 2]),
 }
 
+/// Represents the RAM size in a game
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum RamSize {
+    /// There is no RAM
     None,
+    /// 8 KiB of RAM
     KiloBytes8,
+    /// 32 KiB of RAM
     KiloBytes32,
+    /// 128 KiB of RAM
     KiloBytes128,
+    /// 64 KiB of RAM
     KiloBytes64,
+    /// Unknown RAM size. This variant is not found in comercial games.
     Unknown(u8),
 }
 
 impl RamSize {
+    /// Converts the `RamSize` enum to the number of bytes, if the RAM size is known.
     pub fn into_usize(self) -> Option<usize> {
         match self {
             Self::None => Some(0),
@@ -52,36 +68,66 @@ impl From<u8> for RamSize {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+/// The cartridge type indicates which type of mapper and hardware the cartridge contains
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CartridgeType {
+    /// Fixed ROM memory with a fixed mapping and no additional controls
     RomOnly,
+    /// MBC1 mapper, without RAM or battery
     Mbc1,
+    /// MBC1 mapper, with RAM but without battery
     Mbc1Ram,
+    /// MBC1 mapper, with RAM and battery
     Mbc1RamBattery,
+    /// MBC2 mapper, without battery. MBC2 has embedded RAM into the mapper
     Mbc2,
+    /// MBC2 mapper, with battery. MBC2 has embedded RAM into the mapper
     Mbc2Battery,
+    /// Fixed ROM and RAM, without a mapper IC
     RomRam,
+    /// Fixed ROM and RAM, without a mapper IC, but with battery
     RomRamBattery,
+    /// MMM01 mapper, without RAM or battery
     Mmm01,
+    /// MMM01 mapper, with RAM and without battery
     Mmm01Ram,
+    /// MMM01 mapper, with RAM and battery
     Mmm01RamBattery,
+    /// MBC3 mapper, with RTC and battery
     Mbc3TimerBattery,
+    /// MBC3 mapper, with RTC, RAM and battery
     Mbc3TimerRamBattery,
+    /// MBC3 mapper, without RTC, RAM or battery
     Mbc3,
+    /// MBC3 mapper, with RAM
     Mbc3Ram,
+    /// MBC3 mapper, with RAM and battery
     Mbc3RamBattery,
+    /// MBC5 mapper, without RAM or battery
     Mbc5,
+    /// MBC5 mapper, with RAM and without battery
     Mbc5Ram,
+    /// MBC5 mapper, with RAM and battery
     Mbc5RamBattery,
+    /// MBC5 mapper, with a rumble pack
     Mbc5Rumble,
+    /// MBC5 mapper, with a rumble pack and RAM
     Mbc5RumbleRam,
+    /// MBC5 mapper, with a rumble pack, RAM and battery
     Mbc5RumbleRamBattery,
+    /// MBC6 mapper
     Mbc6,
+    /// MBC7 mapper, with accelerometer, rumble pack, RAM and battery
     Mbc7SensorRumbleRamBattery,
+    /// The cartridge is the game boy camera
     PocketCamera,
+    /// Bandai Tama cartridge
     BandaiTama5,
+    /// HUC3 mapper
     Huc3,
+    /// HUC1 mapper
     Huc1RamBattery,
+    /// Unknown mapper and cartridge type
     Unknown(u8),
 }
 
@@ -127,10 +173,15 @@ impl core::fmt::Display for CartridgeType {
     }
 }
 
+/// Errors related to the cartridge header
 #[derive(Debug)]
 pub enum Error {
+    /// The cartridge does not contain a header
     NoHeader,
+    /// The cartridge contains a header with an invalid title
     InvalidTitle,
+    /// The cartridge contains a header with an invalid RAM size
+    InvalidRamSize,
 }
 
 impl core::fmt::Display for Error {
@@ -139,20 +190,32 @@ impl core::fmt::Display for Error {
     }
 }
 
+/// The cartridge contains a header with an invalid RAM size
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CartridgeHeader<'a> {
+    /// The instructions in the entrypoint of the cartridge, located at address 0x100
     pub entrypoint: &'a [u8],
+    /// The logo stored in the cartridge. In commercial cartridges this is the Nintendo logo.
     pub logo: &'a [u8],
+    /// The title of the game
     pub title: &'a str,
+    /// A code that identifies the manufacturer
     pub manufacturer_code: Option<&'a [u8]>,
+    /// A code that determines if the game is a game boy color only game
     pub cgb_flag: Option<u8>,
+    /// The licensee of the cartridge. Each licensee has a unique code assigned by Nintendo.
     pub licensee: Licensee,
+    /// The size of the ROM, in bytes
     pub rom_size: usize,
+    /// The size of the RAM
     pub ram_size: RamSize,
+    /// The type of cartridge
     pub cartridge_type: CartridgeType,
 }
 
 impl<'a> CartridgeHeader<'a> {
-    pub fn new(data: &'a [u8]) -> Result<Self, Error> {
+    /// Attempts to construct a cartridge header from the raw contents of the cartridge
+    pub fn try_new(data: &'a [u8]) -> Result<Self, Error> {
         if data.len() < 0x150 {
             return Err(Error::NoHeader);
         }
