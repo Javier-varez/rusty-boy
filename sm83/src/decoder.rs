@@ -1,5 +1,8 @@
+//! Functions for decoding CPU instructions.
+
 use sm83_decoder_macros::generate_decoder_tables;
 
+/// Opcodes of the CPU.
 #[derive(Debug, Clone, Copy)]
 pub enum OpCode {
     Ld8RegReg(Register, Register),                 // ld Register, Register
@@ -279,10 +282,13 @@ generate_decoder_tables! {
     },
 }
 
+/// Decodes a single instruction. May return an OpCode::Prefix value, which indicates that this
+/// instruction is prefixed, and `decode_prefixed` must be invoked with the next byte in the stream
 pub fn decode(byte: u8) -> OpCode {
     DECODER_TABLE[byte as usize]
 }
 
+/// Decodes a prefixed instruction by looking at the byte after the 0xCB prefix byte.
 pub fn decode_prefixed(byte: u8) -> OpCode {
     PREFIXED_TABLE[byte as usize]
 }

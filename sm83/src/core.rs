@@ -1,3 +1,6 @@
+//! Contains the core functionality of the SM83 CPU, including the actual CPU, registers
+//! and internal CPU flags.
+
 use crate::{
     decoder::{
         self, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairMem, RegisterPairStack,
@@ -7,15 +10,21 @@ use crate::{
     memory::Memory,
 };
 
+/// A single CPU flag
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]
 pub enum Flag {
+    /// Zero flag
     Z = 1 << 7,
+    /// Negative flag
     N = 1 << 6,
+    /// Half-carry flag
     H = 1 << 5,
+    /// Carry flag
     C = 1 << 4,
 }
 
+/// A combination of CPU flags, which are either set or unset
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Flags(u8);
 
@@ -38,10 +47,12 @@ impl From<Flags> for u8 {
 }
 
 impl Flags {
+    /// Constructs a Flags value with all flags in the unset state
     pub const fn new() -> Self {
         Self(0)
     }
 
+    /// Returns a new set of flags with the value of the given flag set or unset as requested.
     pub const fn with(mut self, flag: Flag, value: bool) -> Self {
         if value {
             self.0 |= flag as u8;
@@ -51,24 +62,37 @@ impl Flags {
         self
     }
 
+    /// Returns true if the given flag is set in the Flags instance.
     pub const fn is_flag_set(&self, flag: Flag) -> bool {
         (self.0 & flag as u8) != 0
     }
 }
 
+/// CPU Registers in a struct
 #[derive(Debug, Clone)]
 pub struct Registers {
+    /// CPU Flags
     pub flags: Flags,
+    /// The A register of the CPU
     pub a_reg: u8,
+    /// The B register of the CPU
     pub b_reg: u8,
+    /// The C register of the CPU
     pub c_reg: u8,
+    /// The D register of the CPU
     pub d_reg: u8,
+    /// The E register of the CPU
     pub e_reg: u8,
+    /// The H register of the CPU
     pub h_reg: u8,
+    /// The L register of the CPU
     pub l_reg: u8,
+    /// The stack pointer of the CPU
     pub sp_reg: u16,
+    /// The program counter of the CPU
     pub pc_reg: u16,
-    pub irq_en: bool, // IME register
+    /// The IME register of the CPU (set if IRQs are globally enabled)
+    pub irq_en: bool,
 }
 
 impl Default for Registers {
@@ -388,20 +412,28 @@ impl From<Cycles> for usize {
     }
 }
 
+/// The exit reason of the CPU after stepping an instruction.
 pub enum ExitReason {
+    /// The step of the instruction concluded successfully, and took the given number of clock cycles.
     Step(Cycles),
+    /// An interrupt was taken, and and took the given number of clock cycles.
     InterruptTaken(Cycles, Interrupt),
+    /// The CPU is stopped, and executed the given number of cycles
     Stop(Cycles),
+    /// The CPU is halted, and executed the given number of cycles
     Halt(Cycles),
+    /// The CPU attempted to execute an illegal OpCode.
     IllegalOpcode,
 }
 
+/// An abstraction of the CPU core
 pub struct Cpu {
     regs: Registers,
     halted: bool,
 }
 
 impl Cpu {
+    /// Constructs a new `Cpu` instance.
     pub fn new() -> Self {
         Self {
             regs: Registers::new(),
@@ -409,10 +441,12 @@ impl Cpu {
         }
     }
 
+    /// Queries the registers of the CPU
     pub const fn get_regs(&self) -> &Registers {
         &self.regs
     }
 
+    /// Mutably queries the registers of the CPU
     pub fn get_mut_regs(&mut self) -> &mut Registers {
         &mut self.regs
     }
@@ -596,6 +630,7 @@ impl Cpu {
         }
     }
 
+    /// Executes a single CPU instruction and returns from the function.
     pub fn step<T: Memory>(&mut self, memory: &mut T, interrupts: Interrupts) -> ExitReason {
         if self.halted && !interrupts.has_any() {
             return ExitReason::Halt(Cycles::new(4));
