@@ -9,8 +9,8 @@
 //! ```rust,no_run
 //! use cartridge::Cartridge;
 //!
-//! let data = std::io::read("my_cartridge.gb");
-//! let cartridge = Cartridge::new(data).unwrap();
+//! let data = std::fs::read("my_cartridge.gb").expect("Unable to read cartridge from disk");
+//! let mut cartridge = Cartridge::try_new(data).expect("Cartridge is not valid");
 //!
 //! // Query the cartridge header with:
 //! let header = cartridge.header();
@@ -19,7 +19,7 @@
 //!
 //! // Perform memory-mapped accesses with:
 //! assert_eq!(cartridge.read(0x4000u16), 0xFA);
-//! cartridge.read(0xA000u16, 0x53);
+//! cartridge.write(0xA000u16, 0x53);
 //! ```
 //!
 #![no_std]
@@ -79,7 +79,7 @@ pub struct Cartridge {
 impl Cartridge {
     /// Constructs a new cartridge using the given ROM data. Can fail if there was a problem
     /// reading the header.
-    pub fn new(rom_data: Vec<u8>) -> Result<Self, Error> {
+    pub fn try_new(rom_data: Vec<u8>) -> Result<Self, Error> {
         let mapper = mappers::new_mapper(rom_data)?;
         Ok(Self { mapper })
     }
