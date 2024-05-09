@@ -1,0 +1,71 @@
+name: Rusty Boy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo_clippy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cargo clippy
+
+  cargo_test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: sudo apt-get install libsdl2-dev
+    - run: cargo test
+
+  cargo_build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: sudo apt-get install libsdl2-dev
+    - run: cargo build -r
+
+  cargo_fmt:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cargo fmt --check
+
+  cargo_doc:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cargo doc
+
+  rusty-date:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        targets: thumbv7em-none-eabihf
+        components: rust-src
+    - name: setup job
+      run: |
+        sudo apt-get install gcc-arm-none-eabi
+        cargo install --git=https://github.com/pd-rs/crank
+        wget https://download.panic.com/playdate_sdk/Linux/PlaydateSDK-2.4.2.tar.gz
+        tar -xf PlaydateSDK-2.4.2.tar.gz
+    - run: PLAYDATE_SDK_PATH=${{ github.workspace }}/PlaydateSDK-2.4.2 crank build --device --release
+      working-directory: rusty-date
