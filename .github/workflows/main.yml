@@ -8,7 +8,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_TOOLCHAIN: 1.72.1
 
 jobs:
   cargo_clippy:
@@ -25,6 +24,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
+    - run: sudo apt install libsdl2-dev
     - run: cargo test
 
   cargo_build:
@@ -33,6 +33,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
+    - run: sudo apt install libsdl2-dev
     - run: cargo build -r
 
   cargo_fmt:
