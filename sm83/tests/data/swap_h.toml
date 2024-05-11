@@ -1,0 +1,36 @@
+
+[test]
+cycles = 8
+
+[test.entry_state]
+h = 0xA5
+flags = ['N', 'C', 'H']
+
+[test.exit_state]
+h = 0x5A
+flags = []
+pc = 2
+
+[test.program]
+instructions = [
+    0xCB,
+    0x34, # swap h
+]
+
+[test2]
+cycles = 8
+
+[test2.entry_state]
+h = 0x00
+flags = ['N', 'C', 'H']
+
+[test2.exit_state]
+h = 0x00
+flags = ['Z']
+pc = 2
+
+[test2.program]
+instructions = [
+    0xCB,
+    0x34, # swap h
+]

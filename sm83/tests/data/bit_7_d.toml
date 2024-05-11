@@ -1,0 +1,37 @@
+
+[bit_set]
+cycles = 8
+
+[bit_set.entry_state]
+d = 0x80
+flags = ['N']
+
+[bit_set.exit_state]
+d = 0x80
+flags = ['H']
+pc = 2
+
+[bit_set.program]
+instructions = [
+    0xCB,
+    0x7a, # bit, 7, d
+]
+
+[bit_unset]
+cycles = 8
+
+[bit_unset.entry_state]
+d = 0x7f
+flags = ['N']
+
+[bit_unset.exit_state]
+d = 0x7f
+flags = ['H', 'Z']
+pc = 2
+
+[bit_unset.program]
+instructions = [
+    0xCB,
+    0x7a, # bit, 7, d
+]
+
