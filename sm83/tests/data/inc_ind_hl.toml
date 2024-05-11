@@ -1,0 +1,39 @@
+[nominal]
+cycles = 12
+
+[nominal.entry_state]
+h = 0x12
+l = 0xFE
+flags = ['C', 'N']
+
+[nominal.exit_state]
+h = 0x12
+l = 0xFE
+pc = 0x01
+memory = { 0x12FE = [0x01] }
+flags = ['C']
+
+[nominal.program]
+instructions = [
+    0x34, # inc [HL]
+]
+
+[zero]
+cycles = 12
+
+[zero.entry_state]
+h = 0x12
+l = 0xFE
+memory = { 0x12FE = [0xFF] }
+
+[zero.exit_state]
+h = 0x12
+l = 0xFE
+pc = 0x01
+memory = { 0x12FE = [0x00] }
+flags = ['Z', 'H']
+
+[zero.program]
+instructions = [
+    0x34, # inc [HL]
+]

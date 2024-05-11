@@ -1,0 +1,66 @@
+[no_overflow]
+cycles = 4
+
+[no_overflow.entry_state]
+a = 0xFE
+flags = ['N']
+
+[no_overflow.exit_state]
+a = 0xFF
+pc = 0x01
+
+[no_overflow.program]
+instructions = [
+    0x3C, # inc a
+]
+
+[overflow]
+cycles = 4
+
+[overflow.entry_state]
+a = 0xFF
+flags = ['N']
+
+[overflow.exit_state]
+a = 0x00
+pc = 0x01
+flags = ['Z', 'H']
+
+[overflow.program]
+instructions = [
+    0x3C, # inc a
+]
+
+[half_carry]
+cycles = 4
+
+[half_carry.entry_state]
+a = 0x2F
+flags = ['N']
+
+[half_carry.exit_state]
+a = 0x30
+pc = 0x01
+flags = ['H']
+
+[half_carry.program]
+instructions = [
+    0x3C, # inc a
+]
+
+[carry]
+cycles = 4
+
+[carry.entry_state]
+a = 0x2F
+flags = ['N', 'C']
+
+[carry.exit_state]
+a = 0x30
+pc = 0x01
+flags = ['H', 'C']
+
+[carry.program]
+instructions = [
+    0x3C, # inc a
+]

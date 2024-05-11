@@ -1,0 +1,15 @@
+[test]
+cycles = 8
+
+[test.entry_state]
+a = 0xA5
+
+[test.exit_state]
+a = 0xC3
+pc = 0x02
+
+[test.program]
+instructions = [
+    0x3E, # ld a, 0xC3
+    0xc3,
+]

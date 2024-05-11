@@ -1,0 +1,29 @@
+[no_underflow]
+cycles = 8
+
+[no_underflow.entry_state]
+sp = 0x12FF
+
+[no_underflow.exit_state]
+sp = 0x12FE
+pc = 0x1
+
+[no_underflow.program]
+instructions = [
+    0x3B, # dec SP
+]
+
+[underflow]
+cycles = 8
+
+[underflow.entry_state]
+sp = 0x1300
+
+[underflow.exit_state]
+sp = 0x12FF
+pc = 0x1
+
+[underflow.program]
+instructions = [
+    0x3B, # dec SP
+]
