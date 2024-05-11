@@ -1,0 +1,39 @@
+# Executes a ld a, b instruction with non-zero value in b
+[move-nonzero]
+cycles = 0x4
+
+[move-nonzero.entry_state]
+a = 0
+b = 0x82
+pc = 0x800
+
+[move-nonzero.exit_state]
+a = 0x82
+b = 0x82
+pc = 0x801
+
+[move-nonzero.program]
+base = 0x800
+instructions = [
+    0x78, # ld a, b
+]
+
+# Executes a ld a, b instruction with zero value in b
+[move-zero]
+cycles = 0x4
+
+[move-zero.entry_state]
+a = 0x12
+b = 0
+pc = 0x800
+
+[move-zero.exit_state]
+a = 0
+b = 0
+pc = 0x801
+
+[move-zero.program]
+base = 0x800
+instructions = [
+    0x78, # ld a, b
+]

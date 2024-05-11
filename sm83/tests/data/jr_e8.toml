@@ -1,0 +1,32 @@
+# Jump to target address
+[forward_jump]
+cycles = 12
+
+[forward_jump.entry_state]
+pc = 0x1234
+
+[forward_jump.exit_state]
+pc = 0x1256
+
+[forward_jump.program]
+base = 0x1234
+instructions = [
+    0x18, # jr +32
+    0x20,
+]
+
+[backward_jump]
+cycles = 12
+
+[backward_jump.entry_state]
+pc = 0x1234
+
+[backward_jump.exit_state]
+pc = 0x11B6
+
+[backward_jump.program]
+base = 0x1234
+instructions = [
+    0x18, # jr -128
+    0x80,
+]
