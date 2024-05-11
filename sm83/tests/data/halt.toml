@@ -1,0 +1,13 @@
+[test]
+cycles = 4
+exit_reason = "Halt"
+
+[test.entry_state]
+
+[test.exit_state]
+pc = 0x01
+
+[test.program]
+instructions = [
+    0x76, # halt
+]
