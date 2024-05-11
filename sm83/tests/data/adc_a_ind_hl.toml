@@ -1,0 +1,92 @@
+[no_carry]
+cycles = 8
+
+[no_carry.entry_state]
+a = 0x12
+h = 0x12
+l = 0x34
+flags = ['Z', 'N', 'C', 'H']
+memory = { 0x1234 = [0xE4] }
+
+[no_carry.exit_state]
+a = 0xF7
+h = 0x12
+l = 0x34
+flags = []
+pc = 1
+memory = { 0x1234 = [0xE4] }
+
+[no_carry.program]
+instructions = [
+    0x8E, # adc a, [hl]
+]
+
+
+[half_carry]
+cycles = 8
+
+[half_carry.entry_state]
+a = 0x12
+h = 0x12
+l = 0x34
+flags = ['Z', 'N', 'C', 'H']
+memory = { 0x1234 = [0xDF] }
+
+[half_carry.exit_state]
+a = 0xF2
+h = 0x12
+l = 0x34
+flags = ['H']
+pc = 1
+memory = { 0x1234 = [0xDF] }
+
+[half_carry.program]
+instructions = [
+    0x8E, # adc a, [hl]
+]
+
+[carry]
+cycles = 8
+
+[carry.entry_state]
+a = 0x12
+h = 0x12
+l = 0x34
+flags = ['Z', 'N', 'C', 'H']
+memory = { 0x1234 = [0xF4] }
+
+[carry.exit_state]
+a = 0x07
+h = 0x12
+l = 0x34
+flags = ['C']
+pc = 1
+memory = { 0x1234 = [0xF4] }
+
+[carry.program]
+instructions = [
+    0x8E, # adc a, [hl]
+]
+
+[zero]
+cycles = 8
+
+[zero.entry_state]
+a = 0x01
+h = 0x12
+l = 0x34
+flags = ['Z', 'N', 'C', 'H']
+memory = { 0x1234 = [0xFE] }
+
+[zero.exit_state]
+a = 0x00
+h = 0x12
+l = 0x34
+flags = ['C', 'H', 'Z']
+pc = 1
+memory = { 0x1234 = [0xFE] }
+
+[zero.program]
+instructions = [
+    0x8E, # adc a, [hl]
+]

@@ -1,0 +1,16 @@
+[test]
+cycles = 4
+
+[test.entry_state]
+a = 0x12
+flags = ['C', 'H']
+
+[test.exit_state]
+a = 0x00
+flags = ['N', 'Z']
+pc = 1
+
+[test.program]
+instructions = [
+    0x97, # sub a, a
+]
