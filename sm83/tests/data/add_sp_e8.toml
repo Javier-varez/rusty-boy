@@ -1,0 +1,53 @@
+[nominal]
+cycles = 16
+
+[nominal.entry_state]
+sp = 0xFF30
+flags = ['Z', 'N']
+
+[nominal.exit_state]
+sp = 0xFFAF
+pc = 0x2
+flags = []
+
+[nominal.program]
+instructions = [
+    0xE8, # add SP, +127
+    0x7F
+]
+
+[flags]
+cycles = 16
+
+[flags.entry_state]
+sp = 0xFFC0
+flags = ['Z', 'N']
+
+[flags.exit_state]
+sp = 0xFF40
+pc = 0x2
+flags = ['C']
+
+[flags.program]
+instructions = [
+    0xE8, # add SP, -128
+    0x80
+]
+
+[half_carry]
+cycles = 16
+
+[half_carry.entry_state]
+sp = 0xFF0F
+flags = ['Z', 'N']
+
+[half_carry.exit_state]
+sp = 0xFF10
+pc = 0x2
+flags = ['H']
+
+[half_carry.program]
+instructions = [
+    0xE8, # add SP, 1
+    0x01
+]

@@ -1,0 +1,37 @@
+[ret1]
+cycles = 16
+
+[ret1.entry_state]
+sp = 0x1234
+memory = { 0x1234 = [0x43, 0x5F] }
+flags = ['Z', 'N', 'H', 'C']
+
+[ret1.exit_state]
+sp = 0x1236
+pc = 0x5F43
+memory = { 0x1234 = [0x43, 0x5F] }
+flags = ['Z', 'N', 'H', 'C']
+irq_en = true
+
+[ret1.program]
+instructions = [
+    0xD9, # reti
+]
+
+[ret2]
+cycles = 16
+
+[ret2.entry_state]
+sp = 0x1234
+memory = { 0x1234 = [0x43, 0x5F] }
+
+[ret2.exit_state]
+sp = 0x1236
+pc = 0x5F43
+memory = { 0x1234 = [0x43, 0x5F] }
+irq_en = true
+
+[ret2.program]
+instructions = [
+    0xD9, # reti
+]

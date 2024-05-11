@@ -1,0 +1,35 @@
+[non_zero]
+cycles = 8
+
+[non_zero.entry_state]
+a = 0x60
+flags = ['Z', 'C', 'H']
+
+[non_zero.exit_state]
+a = 0x3F
+flags = []
+pc = 2
+
+[non_zero.program]
+instructions = [
+    0xEE, # xor a, 0x5F
+    0x5F
+]
+
+[zero]
+cycles = 8
+
+[zero.entry_state]
+a = 0x12
+flags = ['C']
+
+[zero.exit_state]
+a = 0x00
+flags = ['Z']
+pc = 2
+
+[zero.program]
+instructions = [
+    0xEE, # xor a, 0x12
+    0x12
+]

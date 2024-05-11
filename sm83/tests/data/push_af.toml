@@ -1,0 +1,97 @@
+[no_flags]
+cycles = 16
+
+[no_flags.entry_state]
+a = 0x12
+sp = 0x8012
+
+[no_flags.exit_state]
+a = 0x12
+sp = 0x8010
+pc = 1
+memory = { 0x8010 = [0x00, 0x12] }
+
+[no_flags.program]
+instructions = [
+    0xF5, # push af
+]
+
+[zero_flag]
+cycles = 16
+
+[zero_flag.entry_state]
+a = 0x12
+sp = 0x8012
+flags = ['Z']
+
+[zero_flag.exit_state]
+a = 0x12
+sp = 0x8010
+pc = 1
+flags = ['Z']
+memory = { 0x8010 = [0x80, 0x12] }
+
+[zero_flag.program]
+instructions = [
+    0xF5, # push af
+]
+
+[sub_flag]
+cycles = 16
+
+[sub_flag.entry_state]
+a = 0x12
+sp = 0x8012
+flags = ['N']
+
+[sub_flag.exit_state]
+a = 0x12
+sp = 0x8010
+pc = 1
+flags = ['N']
+memory = { 0x8010 = [0x40, 0x12] }
+
+[sub_flag.program]
+instructions = [
+    0xF5, # push af
+]
+
+[half_carry]
+cycles = 16
+
+[half_carry.entry_state]
+a = 0x12
+sp = 0x8012
+flags = ['H']
+
+[half_carry.exit_state]
+a = 0x12
+sp = 0x8010
+pc = 1
+flags = ['H']
+memory = { 0x8010 = [0x20, 0x12] }
+
+[half_carry.program]
+instructions = [
+    0xF5, # push af
+]
+
+[carry]
+cycles = 16
+
+[carry.entry_state]
+a = 0x12
+sp = 0x8012
+flags = ['C']
+
+[carry.exit_state]
+a = 0x12
+sp = 0x8010
+pc = 1
+flags = ['C']
+memory = { 0x8010 = [0x10, 0x12] }
+
+[carry.program]
+instructions = [
+    0xF5, # push af
+]
