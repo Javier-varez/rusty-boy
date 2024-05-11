@@ -1,0 +1,76 @@
+[no_carry]
+cycles = 4
+
+[no_carry.entry_state]
+a = 0x12
+l = 0xE4
+flags = ['Z', 'N', 'C', 'H']
+
+[no_carry.exit_state]
+a = 0xF6
+l = 0xE4
+flags = []
+pc = 1
+
+[no_carry.program]
+instructions = [
+    0x85, # add a, l
+]
+
+
+[half_carry]
+cycles = 4
+
+[half_carry.entry_state]
+a = 0x12
+l = 0xDF
+flags = ['Z', 'N', 'C', 'H']
+
+[half_carry.exit_state]
+a = 0xF1
+l = 0xDF
+flags = ['H']
+pc = 1
+
+[half_carry.program]
+instructions = [
+0x85, # add a, l
+]
+
+[carry]
+cycles = 4
+
+[carry.entry_state]
+a = 0x12
+l = 0xF4
+flags = ['Z', 'N', 'C', 'H']
+
+[carry.exit_state]
+a = 0x06
+l = 0xF4
+flags = ['C']
+pc = 1
+
+[carry.program]
+instructions = [
+0x85, # add a, l
+]
+
+[zero]
+cycles = 4
+
+[zero.entry_state]
+a = 0x01
+l = 0xFF
+flags = ['Z', 'N', 'C', 'H']
+
+[zero.exit_state]
+a = 0x00
+l = 0xFF
+flags = ['C', 'H', 'Z']
+pc = 1
+
+[zero.program]
+instructions = [
+0x85, # add a, l
+]

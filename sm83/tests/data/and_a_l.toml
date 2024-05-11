@@ -1,0 +1,37 @@
+[non_zero]
+cycles = 4
+
+[non_zero.entry_state]
+a = 0xF0
+l = 0x5F
+flags = ['Z', 'C', 'H']
+
+[non_zero.exit_state]
+a = 0x50
+l = 0x5F
+flags = ['H']
+pc = 1
+
+[non_zero.program]
+instructions = [
+    0xa5, # and a, l
+]
+
+[zero]
+cycles = 4
+
+[zero.entry_state]
+a = 0xA5
+l = 0x5A
+flags = ['C']
+
+[zero.exit_state]
+a = 0x00
+l = 0x5A
+flags = ['Z', 'H']
+pc = 1
+
+[zero.program]
+instructions = [
+    0xa5, # and a, l
+]
