@@ -1,0 +1,75 @@
+# Executes an inc l instruction
+[no_overflow]
+cycles = 4
+
+[no_overflow.entry_state]
+l = 0xFE
+pc = 0x800
+flags = ['N']
+
+[no_overflow.exit_state]
+l = 0xFF
+pc = 0x801
+
+[no_overflow.program]
+base = 0x800
+instructions = [
+    0x2C, # inc l
+]
+
+[overflow]
+cycles = 4
+
+[overflow.entry_state]
+l = 0xFF
+pc = 0x800
+flags = ['N']
+
+[overflow.exit_state]
+l = 0x00
+pc = 0x801
+flags = ['Z', 'H']
+
+[overflow.program]
+base = 0x800
+instructions = [
+    0x2C, # inc l
+]
+
+[half_carry]
+cycles = 4
+
+[half_carry.entry_state]
+l = 0x2F
+pc = 0x800
+flags = ['N']
+
+[half_carry.exit_state]
+l = 0x30
+pc = 0x801
+flags = ['H']
+
+[half_carry.program]
+base = 0x800
+instructions = [
+    0x2C, # inc l
+]
+
+[carry]
+cycles = 4
+
+[carry.entry_state]
+l = 0x2F
+pc = 0x800
+flags = ['N', 'C']
+
+[carry.exit_state]
+l = 0x30
+pc = 0x801
+flags = ['H', 'C']
+
+[carry.program]
+base = 0x800
+instructions = [
+    0x2C, # inc l
+]

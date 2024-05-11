@@ -1,0 +1,17 @@
+[test]
+cycles = 8
+
+[test.entry_state]
+l = 0xA5
+pc = 0x800
+
+[test.exit_state]
+l = 0xC3
+pc = 0x802
+
+[test.program]
+base = 0x800
+instructions = [
+    0x2E, # ld L, 0xC3
+    0xc3,
+]
