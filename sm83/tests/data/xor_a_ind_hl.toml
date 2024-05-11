@@ -1,0 +1,45 @@
+[non_zero]
+cycles = 8
+
+[non_zero.entry_state]
+a = 0x60
+h = 0x12
+l = 0x34
+flags = ['Z', 'C', 'H']
+memory = { 0x1234 = [0x5F] }
+
+[non_zero.exit_state]
+a = 0x3F
+h = 0x12
+l = 0x34
+flags = []
+pc = 1
+memory = { 0x1234 = [0x5F] }
+
+[non_zero.program]
+instructions = [
+    0xae, # xor a, [hl]
+]
+
+[zero]
+cycles = 8
+
+[zero.entry_state]
+a = 0x12
+h = 0x12
+l = 0x34
+flags = ['C']
+memory = { 0x1234 = [0x12] }
+
+[zero.exit_state]
+a = 0x00
+h = 0x12
+l = 0x34
+flags = ['Z']
+pc = 1
+memory = { 0x1234 = [0x12] }
+
+[zero.program]
+instructions = [
+    0xae, # xor a, [hl]
+]
