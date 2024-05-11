@@ -1,0 +1,45 @@
+# Executes an ld A, [HL-] instruction
+[test]
+cycles = 8
+
+[test.entry_state]
+h = 0xAA
+l = 0xBB
+flags = ['Z', 'C', 'H', 'N']
+memory = { 0xAABB = [0xF3] }
+
+[test.exit_state]
+a = 0xF3
+h = 0xAA
+l = 0xBA
+pc = 0x1
+flags = ['Z', 'C', 'H', 'N']
+memory = { 0xAABB = [0xF3] }
+
+[test.program]
+instructions = [
+    0x3a, # ld A, [HL-]
+]
+
+# Check with opposite flag values. Check that they are not modified
+[test2]
+cycles = 8
+
+[test2.entry_state]
+h = 0xBB
+l = 0xAA
+flags = []
+memory = { 0xBBAA = [0x12] }
+
+[test2.exit_state]
+a = 0x12
+h = 0xBB
+l = 0xA9
+pc = 0x1
+flags = []
+memory = { 0xBBAA = [0x12] }
+
+[test2.program]
+instructions = [
+    0x3a, # ld A, [HL-]
+]

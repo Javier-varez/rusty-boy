@@ -1,0 +1,44 @@
+[clear_carry]
+cycles = 4
+
+[clear_carry.entry_state]
+flags = ['C', 'N', 'H', 'Z']
+
+[clear_carry.exit_state]
+flags = ['Z']
+pc = 0x01
+
+[clear_carry.program]
+instructions = [
+    0x3F, # ccf
+]
+
+[set_carry]
+cycles = 4
+
+[set_carry.entry_state]
+flags = ['N', 'H', 'Z']
+
+[set_carry.exit_state]
+flags = ['C', 'Z']
+pc = 0x01
+
+[set_carry.program]
+instructions = [
+    0x3F, # ccf
+]
+
+[test_z_flag]
+cycles = 4
+
+[test_z_flag.entry_state]
+flags = ['N', 'H']
+
+[test_z_flag.exit_state]
+flags = ['C']
+pc = 0x01
+
+[test_z_flag.program]
+instructions = [
+    0x3F, # ccf
+]

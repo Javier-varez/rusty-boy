@@ -1,0 +1,14 @@
+[nominal]
+cycles = 4
+
+[nominal.entry_state]
+flags = ['Z', 'N', 'H']
+
+[nominal.exit_state]
+pc = 0x01
+flags = ['Z', 'C']
+
+[nominal.program]
+instructions = [
+    0x37, # scf
+]

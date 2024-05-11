@@ -1,0 +1,16 @@
+[test]
+cycles = 12
+
+[test.entry_state]
+sp = 0x8224
+
+[test.exit_state]
+sp = 0x125A
+pc = 0x03
+
+[test.program]
+instructions = [
+    0x31, # ld SP, 0x125A
+    0x5A,
+    0x12,
+]
