@@ -1,0 +1,73 @@
+# Executes a dec b instruction
+[no_overflow]
+cycles = 4
+
+[no_overflow.entry_state]
+b = 0xFF
+pc = 0x800
+
+[no_overflow.exit_state]
+b = 0xFE
+pc = 0x801
+flags = ['N']
+
+[no_overflow.program]
+base = 0x800
+instructions = [
+    0x5, # dec b
+]
+
+[underflow]
+cycles = 4
+
+[underflow.entry_state]
+b = 0x00
+pc = 0x800
+
+[underflow.exit_state]
+b = 0xFF
+pc = 0x801
+flags = ['N', 'H']
+
+[underflow.program]
+base = 0x800
+instructions = [
+    0x5, # dec b
+]
+
+[zflag]
+cycles = 4
+
+[zflag.entry_state]
+b = 0x1
+pc = 0x800
+
+[zflag.exit_state]
+b = 0x0
+pc = 0x801
+flags = ['N', 'Z']
+
+[zflag.program]
+base = 0x800
+instructions = [
+    0x5, # dec b
+]
+
+[cflag]
+cycles = 4
+
+[cflag.entry_state]
+b = 0x1
+pc = 0x800
+flags = ['C']
+
+[cflag.exit_state]
+b = 0x0
+pc = 0x801
+flags = ['N', 'Z', 'C']
+
+[cflag.program]
+base = 0x800
+instructions = [
+    0x5, # dec b
+]

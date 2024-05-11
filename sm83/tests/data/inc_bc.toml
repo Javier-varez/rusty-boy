@@ -1,0 +1,39 @@
+# Executes an inc bc instruction
+[no_overflow]
+cycles = 8
+
+[no_overflow.entry_state]
+b = 0x12
+c = 0xFE
+pc = 0x800
+
+[no_overflow.exit_state]
+b = 0x12
+c = 0xFF
+pc = 0x801
+
+[no_overflow.program]
+base = 0x800
+instructions = [
+    0x03, # inc bc
+]
+
+# Executes an inc bc instruction
+[overflow]
+cycles = 8
+
+[overflow.entry_state]
+b = 0x12
+c = 0xFF
+pc = 0x800
+
+[overflow.exit_state]
+b = 0x13
+c = 0x00
+pc = 0x801
+
+[overflow.program]
+base = 0x800
+instructions = [
+    0x3, # inc bc
+]

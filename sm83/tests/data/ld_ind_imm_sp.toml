@@ -1,0 +1,40 @@
+# Executes an ld [n16], SP instruction
+[test]
+cycles = 20
+
+[test.entry_state]
+sp = 0xAABB
+flags = ['Z', 'C', 'H', 'N']
+
+[test.exit_state]
+sp = 0xAABB
+pc = 0x3
+flags = ['Z', 'C', 'H', 'N']
+memory = { 0xBCA5 = [0xBB, 0xAA] }
+
+[test.program]
+instructions = [
+    0x8,  # ld [n16], SP
+    0xA5,
+    0xBC,
+]
+
+[test2]
+cycles = 20
+
+[test2.entry_state]
+sp = 0xBBAA
+flags = []
+
+[test2.exit_state]
+sp = 0xBBAA
+pc = 0x3
+flags = []
+memory = { 0xA5BC = [0xAA, 0xBB] }
+
+[test2.program]
+instructions = [
+    0x8,  # ld [n16], SP
+    0xBC,
+    0xA5,
+]

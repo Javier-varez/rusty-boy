@@ -69,7 +69,7 @@ impl Flags {
 }
 
 /// CPU Registers in a struct
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Registers {
     /// CPU Flags
     pub flags: Flags,
@@ -413,6 +413,7 @@ impl From<Cycles> for usize {
 }
 
 /// The exit reason of the CPU after stepping an instruction.
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ExitReason {
     /// The step of the instruction concluded successfully, and took the given number of clock cycles.
     Step(Cycles),
