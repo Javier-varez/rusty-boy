@@ -21,6 +21,7 @@ impl Memory for MemoryImpl {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct State {
     #[serde(default)]
     a: u8,
@@ -50,6 +51,7 @@ struct State {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Program {
     #[serde(default)]
     base: Address,
@@ -78,6 +80,7 @@ impl Default for StepExitReason {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Test {
     entry_state: State,
     exit_state: State,
