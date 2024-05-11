@@ -1,0 +1,45 @@
+
+[reset_bit_1]
+cycles = 16
+
+[reset_bit_1.entry_state]
+h = 0x12
+l = 0x34
+flags = []
+memory = { 0x1234 = [0x20] }
+
+[reset_bit_1.exit_state]
+h = 0x12
+l = 0x34
+flags = []
+pc = 2
+memory = { 0x1234 = [0x00] }
+
+[reset_bit_1.program]
+instructions = [
+    0xCB,
+    0xae, # res, 5, [hl]
+]
+
+[reset_bit_2]
+cycles = 16
+
+[reset_bit_2.entry_state]
+h = 0x12
+l = 0x34
+flags = []
+memory = { 0x1234 = [0xFF] }
+
+[reset_bit_2.exit_state]
+h = 0x12
+l = 0x34
+flags = []
+pc = 2
+memory = { 0x1234 = [0xdf] }
+
+[reset_bit_2.program]
+instructions = [
+    0xCB,
+    0xae, # res, 5, [hl]
+]
+
