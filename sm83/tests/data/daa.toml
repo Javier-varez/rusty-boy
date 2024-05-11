@@ -1,0 +1,148 @@
+[add_adjust]
+cycles = 8
+
+[add_adjust.entry_state]
+a = 0x19
+b = 0x25
+pc = 0x800
+flags = ['H']
+
+[add_adjust.exit_state]
+a = 0x44
+b = 0x25
+pc = 0x802
+
+[add_adjust.program]
+base = 0x800
+instructions = [
+    0x80, # add a, b
+    0x27, # daa
+]
+
+[add_adjust2]
+cycles = 8
+
+[add_adjust2.entry_state]
+a = 0x59
+b = 0x95
+pc = 0x800
+
+[add_adjust2.exit_state]
+a = 0x54
+b = 0x95
+pc = 0x802
+flags = ['C']
+
+[add_adjust2.program]
+base = 0x800
+instructions = [
+    0x80, # add a, b
+    0x27, # daa
+]
+
+[add_adjust3]
+cycles = 8
+
+[add_adjust3.entry_state]
+a = 0x99
+b = 0x99
+pc = 0x800
+
+[add_adjust3.exit_state]
+a = 0x98
+b = 0x99
+pc = 0x802
+flags = ['C']
+
+[add_adjust3.program]
+base = 0x800
+instructions = [
+    0x80, # add a, b
+    0x27, # daa
+]
+
+[add_adjust4]
+cycles = 8
+
+[add_adjust4.entry_state]
+a = 0x01
+b = 0x99
+pc = 0x800
+
+[add_adjust4.exit_state]
+a = 0x00
+b = 0x99
+pc = 0x802
+flags = ['C', 'Z']
+
+[add_adjust4.program]
+base = 0x800
+instructions = [
+    0x80, # add a, b
+    0x27, # daa
+]
+
+[sub_adjust]
+cycles = 8
+
+[sub_adjust.entry_state]
+a = 0x99
+b = 0x12
+pc = 0x800
+
+[sub_adjust.exit_state]
+a = 0x87
+b = 0x12
+pc = 0x802
+flags = ['N']
+
+[sub_adjust.program]
+base = 0x800
+instructions = [
+    0x90, # sub a, b
+    0x27, # daa
+]
+
+[sub_adjust2]
+cycles = 8
+
+[sub_adjust2.entry_state]
+a = 0x15
+b = 0x25
+pc = 0x800
+flags = ['H']
+
+[sub_adjust2.exit_state]
+a = 0x90
+b = 0x25
+pc = 0x802
+flags = ['N', 'C']
+
+[sub_adjust2.program]
+base = 0x800
+instructions = [
+    0x90, # sub a, b
+    0x27, # daa
+]
+
+[sub_adjust3]
+cycles = 8
+
+[sub_adjust3.entry_state]
+a = 0x25
+b = 0x25
+pc = 0x800
+flags = ['H']
+
+[sub_adjust3.exit_state]
+a = 0x00
+b = 0x25
+pc = 0x802
+flags = ['N', 'Z']
+
+[sub_adjust3.program]
+base = 0x800
+instructions = [
+    0x90, # sub a, b
+    0x27, # daa
+]

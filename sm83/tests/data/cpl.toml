@@ -1,0 +1,15 @@
+[test]
+cycles = 4
+
+[test.entry_state]
+a = 0xA5
+
+[test.exit_state]
+a = 0x5A
+pc = 0x1
+flags = ['N', 'H']
+
+[test.program]
+instructions = [
+    0x2F, # cpl
+]

@@ -1,0 +1,18 @@
+# Executes a ld h, n8 instruction
+[test]
+cycles = 8
+
+[test.entry_state]
+h = 0xA5
+pc = 0x800
+
+[test.exit_state]
+h = 0xC3
+pc = 0x802
+
+[test.program]
+base = 0x800
+instructions = [
+    0x26, # ld h, 0xC3
+    0xc3,
+]

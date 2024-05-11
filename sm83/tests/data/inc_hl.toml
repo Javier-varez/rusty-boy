@@ -1,0 +1,39 @@
+# Executes an inc de instruction
+[no_overflow]
+cycles = 8
+
+[no_overflow.entry_state]
+h = 0x12
+l = 0xFE
+pc = 0x800
+
+[no_overflow.exit_state]
+h = 0x12
+l = 0xFF
+pc = 0x801
+
+[no_overflow.program]
+base = 0x800
+instructions = [
+    0x23, # inc HL
+]
+
+# Executes an inc de instruction
+[overflow]
+cycles = 8
+
+[overflow.entry_state]
+h = 0x12
+l = 0xFF
+pc = 0x800
+
+[overflow.exit_state]
+h = 0x13
+l = 0x00
+pc = 0x801
+
+[overflow.program]
+base = 0x800
+instructions = [
+    0x23, # inc HL
+]

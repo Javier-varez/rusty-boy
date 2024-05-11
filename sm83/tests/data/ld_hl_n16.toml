@@ -1,0 +1,21 @@
+# Executes a ld hl, n16 instruction
+[test]
+cycles = 12
+
+[test.entry_state]
+h = 0x82
+l = 0x24
+pc = 0x800
+
+[test.exit_state]
+h = 0x12
+l = 0x5A
+pc = 0x803
+
+[test.program]
+base = 0x800
+instructions = [
+    0x21, # ld HL, 0x125A
+    0x5A,
+    0x12,
+]
