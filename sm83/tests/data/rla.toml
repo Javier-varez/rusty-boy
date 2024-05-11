@@ -1,0 +1,57 @@
+# Executes a rla instruction
+[test]
+cycles = 4
+
+[test.entry_state]
+a = 0xA5
+pc = 0x800
+flags = ['Z', 'C', 'H', 'N']
+
+[test.exit_state]
+a = 0x4B
+pc = 0x801
+flags = ['C']
+
+[test.program]
+base = 0x800
+instructions = [
+    0x17, # rla
+]
+
+[test2]
+cycles = 4
+
+[test2.entry_state]
+a = 0xA5
+pc = 0x800
+flags = ['Z', 'H', 'N']
+
+[test2.exit_state]
+a = 0x4A
+pc = 0x801
+flags = ['C']
+
+[test2.program]
+base = 0x800
+instructions = [
+    0x17, # rla
+]
+
+[test3]
+cycles = 4
+
+[test3.entry_state]
+a = 0x25
+pc = 0x800
+flags = ['Z', 'H', 'N']
+
+[test3.exit_state]
+a = 0x4A
+pc = 0x801
+flags = []
+
+[test3.program]
+base = 0x800
+instructions = [
+    0x17, # rla
+]

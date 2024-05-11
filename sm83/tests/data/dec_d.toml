@@ -1,73 +1,73 @@
-# Executes a dec c instruction
+# Executes a dec d instruction
 [no_overflow]
 cycles = 4
 
 [no_overflow.entry_state]
-c = 0xFF
+d = 0xFF
 pc = 0x800
 
 [no_overflow.exit_state]
-c = 0xFE
+d = 0xFE
 pc = 0x801
 flags = ['N']
 
 [no_overflow.program]
 base = 0x800
 instructions = [
-    0xD, # dec c
+    0x15, # dec d
 ]
 
 [underflow]
 cycles = 4
 
 [underflow.entry_state]
-c = 0x00
+d = 0x00
 pc = 0x800
 
 [underflow.exit_state]
-c = 0xFF
+d = 0xFF
 pc = 0x801
 flags = ['N', 'H']
 
 [underflow.program]
 base = 0x800
 instructions = [
-    0xD, # dec c
+    0x15, # dec d
 ]
 
 [zflag]
 cycles = 4
 
 [zflag.entry_state]
-c = 0x1
+d = 0x1
 pc = 0x800
 
 [zflag.exit_state]
-c = 0x0
+d = 0x0
 pc = 0x801
 flags = ['N', 'Z']
 
 [zflag.program]
 base = 0x800
 instructions = [
-    0xD, # dec c
+    0x15, # dec d
 ]
 
 [cflag]
 cycles = 4
 
 [cflag.entry_state]
-c = 0x1
+d = 0x1
 pc = 0x800
 flags = ['C']
 
 [cflag.exit_state]
-c = 0x0
+d = 0x0
 pc = 0x801
 flags = ['N', 'Z', 'C']
 
 [cflag.program]
 base = 0x800
 instructions = [
-    0xD, # dec c
+    0x15, # dec d
 ]
