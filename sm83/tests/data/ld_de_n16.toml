@@ -1,0 +1,21 @@
+# Executes a ld de, n16 instruction
+[test]
+cycles = 12
+
+[test.entry_state]
+d = 0x82
+e = 0x24
+pc = 0x800
+
+[test.exit_state]
+d = 0x12
+e = 0x5A
+pc = 0x803
+
+[test.program]
+base = 0x800
+instructions = [
+    0x11, # ld de, 0x125A
+    0x5A,
+    0x12,
+]

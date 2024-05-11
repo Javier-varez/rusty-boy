@@ -1,0 +1,16 @@
+# Executes a stop instruction
+[stop]
+cycles = 0x4
+exit_reason = "Stop"
+
+[stop.entry_state]
+pc = 0x800
+
+[stop.exit_state]
+pc = 0x801
+
+[stop.program]
+base = 0x800
+instructions = [
+    0x10, # stop
+]

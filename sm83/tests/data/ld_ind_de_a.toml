@@ -1,0 +1,23 @@
+# Executes a ld [de], a instruction
+[test]
+cycles = 8
+
+[test.entry_state]
+a = 0xa5
+d = 0x12
+e = 0x34
+pc = 0x800
+memory = { 0x1234 = [0] }
+
+[test.exit_state]
+a = 0xa5
+d = 0x12
+e = 0x34
+pc = 0x801
+memory = { 0x1234 = [0xA5] }
+
+[test.program]
+base = 0x800
+instructions = [
+    0x12, # ld [de], a
+]
