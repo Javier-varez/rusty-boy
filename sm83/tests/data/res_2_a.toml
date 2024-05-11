@@ -1,0 +1,35 @@
+
+[reset_bit_1]
+cycles = 8
+
+[reset_bit_1.entry_state]
+a = 0x4
+
+[reset_bit_1.exit_state]
+a = 0x00
+pc = 2
+
+[reset_bit_1.program]
+instructions = [
+    0xCB,
+    0x97, # res, 2, a
+]
+
+[reset_bit_2]
+cycles = 8
+
+[reset_bit_2.entry_state]
+a = 0xFF
+flags = []
+
+[reset_bit_2.exit_state]
+a = 0xfb
+flags = []
+pc = 2
+
+[reset_bit_2.program]
+instructions = [
+    0xCB,
+    0x97, # res, 2, a
+]
+

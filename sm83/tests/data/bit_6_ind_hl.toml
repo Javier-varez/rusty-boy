@@ -1,0 +1,45 @@
+
+[bit_set]
+cycles = 12
+
+[bit_set.entry_state]
+h = 0x12
+l = 0x34
+flags = ['N']
+memory = { 0x1234 = [0x40] }
+
+[bit_set.exit_state]
+h = 0x12
+l = 0x34
+flags = ['H']
+pc = 2
+memory = { 0x1234 = [0x40] }
+
+[bit_set.program]
+instructions = [
+    0xCB,
+    0x76, # bit, 6, [hl]
+]
+
+[bit_unset]
+cycles = 12
+
+[bit_unset.entry_state]
+h = 0x12
+l = 0x34
+flags = ['N']
+memory = { 0x1234 = [0xbf] }
+
+[bit_unset.exit_state]
+h = 0x12
+l = 0x34
+flags = ['H', 'Z']
+pc = 2
+memory = { 0x1234 = [0xbf] }
+
+[bit_unset.program]
+instructions = [
+    0xCB,
+    0x76, # bit, 6, [hl]
+]
+

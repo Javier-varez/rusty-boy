@@ -1,0 +1,72 @@
+
+[test]
+cycles = 8
+
+[test.entry_state]
+l = 0xA5
+flags = ['Z', 'C', 'H']
+
+[test.exit_state]
+l = 0x4B
+flags = ['C']
+pc = 2
+
+[test.program]
+instructions = [
+    0xCB,
+    0x15, # rl l
+]
+
+[test2]
+cycles = 8
+
+[test2.entry_state]
+l = 0xA5
+flags = ['Z', 'H']
+
+[test2.exit_state]
+l = 0x4A
+flags = ['C']
+pc = 2
+
+[test2.program]
+instructions = [
+    0xCB,
+    0x15, # rl l
+]
+
+[test3]
+cycles = 8
+
+[test3.entry_state]
+l = 0x25
+flags = ['Z', 'C', 'H']
+
+[test3.exit_state]
+l = 0x4B
+flags = []
+pc = 2
+
+[test3.program]
+instructions = [
+    0xCB,
+    0x15, # rl l
+]
+
+[test4]
+cycles = 8
+
+[test4.entry_state]
+l = 0x80
+flags = ['N', 'H']
+
+[test4.exit_state]
+l = 0x00
+flags = ['C', 'Z']
+pc = 2
+
+[test4.program]
+instructions = [
+    0xCB,
+    0x15, # rl l
+]
