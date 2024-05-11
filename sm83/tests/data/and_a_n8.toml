@@ -1,0 +1,35 @@
+[non_zero]
+cycles = 8
+
+[non_zero.entry_state]
+a = 0xF0
+flags = ['Z', 'C', 'H']
+
+[non_zero.exit_state]
+a = 0x50
+flags = ['H']
+pc = 2
+
+[non_zero.program]
+instructions = [
+    0xE6, # and a, 0x5F
+    0x5F
+]
+
+[zero]
+cycles = 8
+
+[zero.entry_state]
+a = 0xA5
+flags = ['C']
+
+[zero.exit_state]
+a = 0x00
+flags = ['Z', 'H']
+pc = 2
+
+[zero.program]
+instructions = [
+    0xE6, # and a, 0x5A
+    0x5A
+]

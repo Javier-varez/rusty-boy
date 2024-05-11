@@ -1,0 +1,19 @@
+[rst0x10]
+cycles = 16
+
+[rst0x10.entry_state]
+pc = 0x1234
+sp = 0x8040
+flags = ['Z', 'N', 'C', 'H']
+
+[rst0x10.exit_state]
+sp = 0x803E
+flags = ['Z', 'N', 'C', 'H']
+pc = 0x10
+memory = { 0x803E = [0x35, 0x12] }
+
+[rst0x10.program]
+base = 0x1234
+instructions = [
+    0xD7, # rst 0x10
+]

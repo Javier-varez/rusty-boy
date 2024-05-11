@@ -1,0 +1,19 @@
+[push]
+cycles = 16
+
+[push.entry_state]
+h = 0x12
+l = 0x65
+sp = 0x8012
+
+[push.exit_state]
+h = 0x12
+l = 0x65
+sp = 0x8010
+pc = 1
+memory = { 0x8010 = [0x65, 0x12] }
+
+[push.program]
+instructions = [
+    0xE5, # push hl
+]

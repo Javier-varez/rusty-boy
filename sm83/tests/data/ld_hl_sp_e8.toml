@@ -1,0 +1,39 @@
+[positive_offset]
+cycles = 12
+
+[positive_offset.entry_state]
+sp = 0x1204
+flags = ['N', 'Z']
+
+[positive_offset.exit_state]
+sp = 0x1204
+h = 0x12
+l = 0x83
+pc = 2
+flags = ['H']
+
+[positive_offset.program]
+instructions = [
+    0xF8, # ld HL, +127
+    0x7f,
+]
+
+[negative_offset]
+cycles = 12
+
+[negative_offset.entry_state]
+sp = 0x1294
+flags = ['N', 'Z']
+
+[negative_offset.exit_state]
+sp = 0x1294
+h = 0x12
+l = 0x14
+pc = 2
+flags = ['C']
+
+[negative_offset.program]
+instructions = [
+    0xF8, # ld HL, -128
+    0x80,
+]

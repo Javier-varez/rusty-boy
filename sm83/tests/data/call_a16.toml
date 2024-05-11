@@ -1,0 +1,41 @@
+[call1]
+cycles = 24
+
+[call1.entry_state]
+pc = 0x4054
+sp = 0x8012
+flags = ['Z', 'N', 'C', 'H']
+
+[call1.exit_state]
+sp = 0x8010
+pc = 0x1234
+memory = { 0x8010 = [0x57, 0x40] }
+flags = ['Z', 'N', 'C', 'H']
+
+[call1.program]
+base = 0x4054
+instructions = [
+    0xCD, # call 0x1234
+    0x34,
+    0x12,
+]
+
+[call2]
+cycles = 24
+
+[call2.entry_state]
+pc = 0x4054
+sp = 0x8012
+
+[call2.exit_state]
+sp = 0x8010
+pc = 0x1234
+memory = { 0x8010 = [0x57, 0x40] }
+
+[call2.program]
+base = 0x4054
+instructions = [
+    0xCD, # call 0x1234
+    0x34,
+    0x12,
+]

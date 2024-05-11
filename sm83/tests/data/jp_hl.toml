@@ -1,0 +1,16 @@
+[test]
+cycles = 4
+
+[test.entry_state]
+h = 0x12
+l = 0x34
+
+[test.exit_state]
+h = 0x12
+l = 0x34
+pc = 0x1234
+
+[test.program]
+instructions = [
+    0xE9, # jp HL
+]

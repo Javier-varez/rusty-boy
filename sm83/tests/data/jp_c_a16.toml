@@ -1,0 +1,31 @@
+[taken]
+cycles = 16
+
+[taken.entry_state]
+flags = ['C']
+
+[taken.exit_state]
+flags = ['C']
+pc = 0x1234
+
+[taken.program]
+instructions = [
+    0xDA, # jp C, 0x1234
+    0x34,
+    0x12,
+]
+
+[not_taken]
+cycles = 12
+
+[not_taken.entry_state]
+
+[not_taken.exit_state]
+pc = 0x3
+
+[not_taken.program]
+instructions = [
+    0xDA, # jp C, 0x1234
+    0x34,
+    0x12,
+]
