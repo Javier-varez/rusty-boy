@@ -1,0 +1,72 @@
+[no_overflow]
+cycles = 4
+
+[no_overflow.entry_state]
+l = 0xFF
+pc = 0x800
+
+[no_overflow.exit_state]
+l = 0xFE
+pc = 0x801
+flags = ['N']
+
+[no_overflow.program]
+base = 0x800
+instructions = [
+    0x2D, # dec L
+]
+
+[underflow]
+cycles = 4
+
+[underflow.entry_state]
+l = 0x00
+pc = 0x800
+
+[underflow.exit_state]
+l = 0xFF
+pc = 0x801
+flags = ['N', 'H']
+
+[underflow.program]
+base = 0x800
+instructions = [
+    0x2D, # dec L
+]
+
+[zflag]
+cycles = 4
+
+[zflag.entry_state]
+l = 0x1
+pc = 0x800
+
+[zflag.exit_state]
+l = 0x0
+pc = 0x801
+flags = ['N', 'Z']
+
+[zflag.program]
+base = 0x800
+instructions = [
+    0x2D, # dec L
+]
+
+[cflag]
+cycles = 4
+
+[cflag.entry_state]
+l = 0x1
+pc = 0x800
+flags = ['C']
+
+[cflag.exit_state]
+l = 0x0
+pc = 0x801
+flags = ['N', 'Z', 'C']
+
+[cflag.program]
+base = 0x800
+instructions = [
+    0x2D, # dec L
+]
