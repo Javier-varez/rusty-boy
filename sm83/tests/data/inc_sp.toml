@@ -1,0 +1,29 @@
+[no_overflow]
+cycles = 8
+
+[no_overflow.entry_state]
+sp = 0x12FE
+
+[no_overflow.exit_state]
+sp = 0x12FF
+pc = 0x01
+
+[no_overflow.program]
+instructions = [
+    0x33, # inc SP
+]
+
+[overflow]
+cycles = 8
+
+[overflow.entry_state]
+sp = 0x12FF
+
+[overflow.exit_state]
+sp = 0x1300
+pc = 0x01
+
+[overflow.program]
+instructions = [
+    0x33, # inc SP
+]

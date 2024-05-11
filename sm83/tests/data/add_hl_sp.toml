@@ -1,0 +1,66 @@
+## ADD HL, SP
+##    1  8
+##  - 0 H C
+
+[nominal]
+cycles = 8
+
+[nominal.entry_state]
+h = 0x05
+l = 0xFF
+sp = 0xAABB
+flags = ['Z', 'N']
+
+[nominal.exit_state]
+h = 0xB0
+l = 0xBA
+sp = 0xAABB
+pc = 0x1
+flags = ['Z', 'H']
+
+[nominal.program]
+instructions = [
+    0x39, # add HL, SP
+]
+
+[flags]
+cycles = 8
+
+[flags.entry_state]
+h = 0x55
+l = 0xFF
+sp = 0xAABB
+flags = ['N']
+
+[flags.exit_state]
+h = 0x00
+l = 0xBA
+sp = 0xAABB
+pc = 0x1
+flags = ['C', 'H']
+
+[flags.program]
+instructions = [
+    0x39, # add HL, SP
+]
+
+[no_carry]
+cycles = 8
+
+[no_carry.entry_state]
+h = 0x11
+l = 0x22
+sp = 0xAABB
+flags = ['N']
+
+[no_carry.exit_state]
+h = 0xBB
+l = 0xDD
+sp = 0xAABB
+pc = 0x1
+flags = []
+
+[no_carry.program]
+instructions = [
+    0x39, # add HL, SP
+]

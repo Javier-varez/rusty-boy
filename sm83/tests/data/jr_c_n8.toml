@@ -1,0 +1,67 @@
+[forward_jump_taken]
+cycles = 12
+
+[forward_jump_taken.entry_state]
+pc = 0x1234
+flags = ['C']
+
+[forward_jump_taken.exit_state]
+pc = 0x1256
+flags = ['C']
+
+[forward_jump_taken.program]
+base = 0x1234
+instructions = [
+    0x38, # jr C, +32
+    0x20,
+]
+
+[backward_jump_taken]
+cycles = 12
+
+[backward_jump_taken.entry_state]
+pc = 0x1234
+flags = ['C']
+
+[backward_jump_taken.exit_state]
+pc = 0x11B6
+flags = ['C']
+
+[backward_jump_taken.program]
+base = 0x1234
+instructions = [
+    0x38, # jr C, -128
+    0x80,
+]
+
+[forward_jump_not_taken]
+cycles = 8
+
+[forward_jump_not_taken.entry_state]
+pc = 0x1234
+
+[forward_jump_not_taken.exit_state]
+pc = 0x1236
+
+[forward_jump_not_taken.program]
+base = 0x1234
+instructions = [
+    0x38, # jr C, +32
+    0x20,
+]
+
+[backward_jump_not_taken]
+cycles = 8
+
+[backward_jump_not_taken.entry_state]
+pc = 0x1234
+
+[backward_jump_not_taken.exit_state]
+pc = 0x1236
+
+[backward_jump_not_taken.program]
+base = 0x1234
+instructions = [
+    0x38, # jr C, -128
+    0x80,
+]

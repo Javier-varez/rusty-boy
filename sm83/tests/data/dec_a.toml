@@ -1,0 +1,64 @@
+[no_overflow]
+cycles = 4
+
+[no_overflow.entry_state]
+a = 0xFF
+
+[no_overflow.exit_state]
+a = 0xFE
+pc = 0x01
+flags = ['N']
+
+[no_overflow.program]
+instructions = [
+    0x3D, # dec A
+]
+
+[underflow]
+cycles = 4
+
+[underflow.entry_state]
+a = 0x00
+
+[underflow.exit_state]
+a = 0xFF
+pc = 0x01
+flags = ['N', 'H']
+
+[underflow.program]
+instructions = [
+    0x3D, # dec A
+]
+
+[zflag]
+cycles = 4
+
+[zflag.entry_state]
+a = 0x1
+
+[zflag.exit_state]
+a = 0x0
+pc = 0x01
+flags = ['N', 'Z']
+
+[zflag.program]
+instructions = [
+    0x3D, # dec A
+]
+
+[cflag]
+cycles = 4
+
+[cflag.entry_state]
+a = 0x1
+flags = ['C']
+
+[cflag.exit_state]
+a = 0x0
+pc = 0x01
+flags = ['N', 'Z', 'C']
+
+[cflag.program]
+instructions = [
+    0x3D, # dec A
+]
