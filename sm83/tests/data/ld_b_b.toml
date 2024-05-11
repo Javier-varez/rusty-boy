@@ -5,25 +5,21 @@ cycles = 4
 cycles = 4
 
 [move-nonzero.entry_state]
-a = 0
 b = 130
 
 [move-nonzero.exit_state]
-a = 130
 b = 130
 pc = 1
 
 [move-nonzero.program]
-instructions = [ 120,]
+instructions = [ 64,]
 
 [move-zero.entry_state]
-a = 130
 b = 0
 
 [move-zero.exit_state]
-a = 0
 b = 0
 pc = 1
 
 [move-zero.program]
-instructions = [ 120,]
+instructions = [ 64,]

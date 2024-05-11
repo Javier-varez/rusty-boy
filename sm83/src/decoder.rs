@@ -1,4 +1,24 @@
 //! Functions for decoding CPU instructions.
+//!
+//! +----+------------+-----------+------------+------------+-------------+-----------+------------+-----------+-------------+-----------+------------+------------+------------+------------+------------+---------+
+//! |    |     x0     |     x1    |     x2     |     x3     |      x4     |     x5    |     x6     |     x7    |      x8     |     x9    |     xa     |     xb     |     xc     |     xd     |     xe     |    xf   |
+//! | 0x |    NOP     | LD BC n16 | LD [BC] A  |   INC BC   |    INC B    |   DEC B   |  LD B n8   |    RLCA   | LD [a16] SP | ADD HL BC | LD A [BC]  |   DEC BC   |   INC C    |   DEC C    |  LD C n8   |   RRCA  |
+//! | 1x |  STOP n8   | LD DE n16 | LD [DE] A  |   INC DE   |    INC D    |   DEC D   |  LD D n8   |    RLA    |    JR e8    | ADD HL DE | LD A [DE]  |   DEC DE   |   INC E    |   DEC E    |  LD E n8   |   RRA   |
+//! | 2x |  JR NZ e8  | LD HL n16 | LD [HL+] A |   INC HL   |    INC H    |   DEC H   |  LD H n8   |    DAA    |   JR Z e8   | ADD HL HL | LD A [HL+] |   DEC HL   |   INC L    |   DEC L    |  LD L n8   |   CPL   |
+//! | 3x |  JR NC e8  | LD SP n16 | LD [HL-] A |   INC SP   |   INC [HL]  |  DEC [HL] | LD [HL] n8 |    SCF    |   JR C e8   | ADD HL SP | LD A [HL-] |   DEC SP   |   INC A    |   DEC A    |  LD A n8   |   CCF   |
+//! | 4x |   LD B B   |   LD B C  |   LD B D   |   LD B E   |    LD B H   |   LD B L  | LD B [HL]  |   LD B A  |    LD C B   |   LD C C  |   LD C D   |   LD C E   |   LD C H   |   LD C L   | LD C [HL]  |  LD C A |
+//! | 5x |   LD D B   |   LD D C  |   LD D D   |   LD D E   |    LD D H   |   LD D L  | LD D [HL]  |   LD D A  |    LD E B   |   LD E C  |   LD E D   |   LD E E   |   LD E H   |   LD E L   | LD E [HL]  |  LD E A |
+//! | 6x |   LD H B   |   LD H C  |   LD H D   |   LD H E   |    LD H H   |   LD H L  | LD H [HL]  |   LD H A  |    LD L B   |   LD L C  |   LD L D   |   LD L E   |   LD L H   |   LD L L   | LD L [HL]  |  LD L A |
+//! | 7x | LD [HL] B  | LD [HL] C | LD [HL] D  | LD [HL] E  |  LD [HL] H  | LD [HL] L |    HALT    | LD [HL] A |    LD A B   |   LD A C  |   LD A D   |   LD A E   |   LD A H   |   LD A L   | LD A [HL]  |  LD A A |
+//! | 8x |  ADD A B   |  ADD A C  |  ADD A D   |  ADD A E   |   ADD A H   |  ADD A L  | ADD A [HL] |  ADD A A  |   ADC A B   |  ADC A C  |  ADC A D   |  ADC A E   |  ADC A H   |  ADC A L   | ADC A [HL] | ADC A A |
+//! | 9x |  SUB A B   |  SUB A C  |  SUB A D   |  SUB A E   |   SUB A H   |  SUB A L  | SUB A [HL] |  SUB A A  |   SBC A B   |  SBC A C  |  SBC A D   |  SBC A E   |  SBC A H   |  SBC A L   | SBC A [HL] | SBC A A |
+//! | ax |  AND A B   |  AND A C  |  AND A D   |  AND A E   |   AND A H   |  AND A L  | AND A [HL] |  AND A A  |   XOR A B   |  XOR A C  |  XOR A D   |  XOR A E   |  XOR A H   |  XOR A L   | XOR A [HL] | XOR A A |
+//! | bx |   OR A B   |   OR A C  |   OR A D   |   OR A E   |    OR A H   |   OR A L  | OR A [HL]  |   OR A A  |    CP A B   |   CP A C  |   CP A D   |   CP A E   |   CP A H   |   CP A L   | CP A [HL]  |  CP A A |
+//! | cx |   RET NZ   |   POP BC  | JP NZ a16  |   JP a16   | CALL NZ a16 |  PUSH BC  |  ADD A n8  |  RST $00  |    RET Z    |    RET    |  JP Z a16  |   PREFIX   | CALL Z a16 |  CALL a16  |  ADC A n8  | RST $08 |
+//! | dx |   RET NC   |   POP DE  | JP NC a16  | ILLEGAL_D3 | CALL NC a16 |  PUSH DE  |  SUB A n8  |  RST $10  |    RET C    |    RETI   |  JP C a16  | ILLEGAL_DB | CALL C a16 | ILLEGAL_DD |  SBC A n8  | RST $18 |
+//! | ex | LDH [a8] A |   POP HL  |  LD [C] A  | ILLEGAL_E3 |  ILLEGAL_E4 |  PUSH HL  |  AND A n8  |  RST $20  |  ADD SP e8  |   JP HL   | LD [a16] A | ILLEGAL_EB | ILLEGAL_EC | ILLEGAL_ED |  XOR A n8  | RST $28 |
+//! | fx | LDH A [a8] |   POP AF  |  LD A [C]  |     DI     |  ILLEGAL_F4 |  PUSH AF  |  OR A n8   |  RST $30  | LD HL SP e8 |  LD SP HL | LD A [a16] |     EI     | ILLEGAL_FC | ILLEGAL_FD |  CP A n8   | RST $38 |
+//! +----+------------+-----------+------------+------------+-------------+-----------+------------+-----------+-------------+-----------+------------+------------+------------+------------+------------+---------+
 
 use sm83_decoder_macros::generate_decoder_tables;
 

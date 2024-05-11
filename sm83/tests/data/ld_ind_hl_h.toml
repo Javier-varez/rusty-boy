@@ -1,0 +1,35 @@
+[move-nonzero]
+cycles = 8
+
+[move-zero]
+cycles = 8
+
+[move-nonzero.entry_state]
+h = 130
+l = 52
+
+[move-nonzero.exit_state]
+h = 130
+l = 52
+pc = 1
+
+[move-nonzero.program]
+instructions = [ 116,]
+
+[move-zero.entry_state]
+h = 0
+l = 52
+
+[move-zero.exit_state]
+h = 0
+l = 52
+pc = 1
+
+[move-zero.program]
+instructions = [ 116,]
+
+[move-nonzero.exit_state.memory]
+0x8234 = [ 130,]
+
+[move-zero.entry_state.memory]
+0x0034 = [ 130,]
