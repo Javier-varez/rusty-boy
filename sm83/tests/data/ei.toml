@@ -1,0 +1,14 @@
+[test]
+cycles = 4
+
+[test.entry_state]
+irq_en = false
+
+[test.exit_state]
+irq_en = true
+pc = 0x1
+
+[test.program]
+instructions = [
+    0xFB, # ei
+]

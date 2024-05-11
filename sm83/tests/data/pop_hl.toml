@@ -1,0 +1,18 @@
+[test]
+cycles = 12
+
+[test.entry_state]
+sp = 0x1234
+memory = { 0x1234 = [0x43, 0x5F] }
+
+[test.exit_state]
+sp = 0x1236
+h = 0x5f
+l = 0x43
+pc = 1
+memory = { 0x1234 = [0x43, 0x5F] }
+
+[test.program]
+instructions = [
+    0xE1, # pop hl
+]

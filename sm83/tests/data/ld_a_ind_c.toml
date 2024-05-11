@@ -1,0 +1,40 @@
+[test]
+cycles = 8
+
+[test.entry_state]
+c = 0xBB
+flags = ['Z', 'C', 'H', 'N']
+memory = { 0xFFBB = [0xF3] }
+
+[test.exit_state]
+a = 0xF3
+c = 0xBB
+pc = 0x1
+flags = ['Z', 'C', 'H', 'N']
+memory = { 0xFFBB = [0xF3] }
+
+[test.program]
+instructions = [
+    0xF2, # ld A, [C]
+]
+
+# Check with opposite flag values. Check that they are not modified
+[test2]
+cycles = 8
+
+[test2.entry_state]
+c = 0xAA
+flags = []
+memory = { 0xFFAA = [0x12] }
+
+[test2.exit_state]
+a = 0x12
+c = 0xAA
+pc = 0x1
+flags = []
+memory = { 0xFFAA = [0x12] }
+
+[test2.program]
+instructions = [
+    0xF2, # ld A, [C]
+]

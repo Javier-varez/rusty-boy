@@ -1,0 +1,18 @@
+[test]
+cycles = 8
+
+[test.entry_state]
+h = 0x12
+l = 0x34
+sp = 0x8224
+
+[test.exit_state]
+h = 0x12
+l = 0x34
+sp = 0x1234
+pc = 0x01
+
+[test.program]
+instructions = [
+    0xF9, # ld SP, HL
+]

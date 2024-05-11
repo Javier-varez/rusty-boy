@@ -1,0 +1,37 @@
+[move-nonzero]
+cycles = 16
+
+[move-nonzero.entry_state]
+memory = { 0x1234 = [ 130,] }
+a = 0
+
+[move-nonzero.exit_state]
+a = 130
+pc = 3
+memory = { 0x1234 = [ 130,] }
+
+[move-nonzero.program]
+instructions = [
+    0xFA, # ld a, [0x1234]
+    0x34,
+    0x12
+]
+
+[move-zero]
+cycles = 16
+
+[move-zero.entry_state]
+a = 130
+memory = { 0x1234 = [ 0 ] }
+
+[move-zero.exit_state]
+a = 0
+pc = 3
+memory = { 0x1234 = [ 0 ] }
+
+[move-zero.program]
+instructions = [
+    0xFA, # ld a, [0x1234]
+    0x34,
+    0x12
+]

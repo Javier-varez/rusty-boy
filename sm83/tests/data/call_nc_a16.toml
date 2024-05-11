@@ -1,0 +1,40 @@
+[taken]
+cycles = 24
+
+[taken.entry_state]
+pc = 0x4054
+sp = 0x8012
+
+[taken.exit_state]
+sp = 0x8010
+pc = 0x1234
+memory = { 0x8010 = [0x57, 0x40] }
+
+[taken.program]
+base = 0x4054
+instructions = [
+    0xD4, # call NC, 0x1234
+    0x34,
+    0x12,
+]
+
+[not_taken]
+cycles = 12
+
+[not_taken.entry_state]
+sp = 0x8012
+pc = 0x4054
+flags = ['C']
+
+[not_taken.exit_state]
+sp = 0x8012
+pc = 0x4057
+flags = ['C']
+
+[not_taken.program]
+base = 0x4054
+instructions = [
+    0xD4, # call NC, 0x1234
+    0x34,
+    0x12,
+]

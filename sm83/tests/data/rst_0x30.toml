@@ -1,0 +1,19 @@
+[rst0x30]
+cycles = 16
+
+[rst0x30.entry_state]
+pc = 0x1234
+sp = 0x8040
+flags = ['Z', 'N', 'C', 'H']
+
+[rst0x30.exit_state]
+sp = 0x803E
+flags = ['Z', 'N', 'C', 'H']
+pc = 0x30
+memory = { 0x803E = [0x35, 0x12] }
+
+[rst0x30.program]
+base = 0x1234
+instructions = [
+    0xF7, # rst 0x30
+]

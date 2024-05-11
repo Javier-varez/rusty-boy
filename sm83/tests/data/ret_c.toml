@@ -1,0 +1,35 @@
+[taken]
+cycles = 20
+
+[taken.entry_state]
+sp = 0x1234
+memory = { 0x1234 = [0x43, 0x5F] }
+flags = ['C']
+
+[taken.exit_state]
+sp = 0x1236
+pc = 0x5F43
+memory = { 0x1234 = [0x43, 0x5F] }
+flags = ['C']
+
+[taken.program]
+instructions = [
+    0xD8, # ret C
+]
+
+[not_taken]
+cycles = 8
+
+[not_taken.entry_state]
+sp = 0x1234
+memory = { 0x1234 = [0x43, 0x5F] }
+
+[not_taken.exit_state]
+sp = 0x1234
+pc = 0x1
+memory = { 0x1234 = [0x43, 0x5F] }
+
+[not_taken.program]
+instructions = [
+    0xD8, # ret C
+]

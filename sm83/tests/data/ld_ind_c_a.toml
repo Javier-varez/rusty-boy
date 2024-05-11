@@ -1,0 +1,36 @@
+[move-nonzero]
+cycles = 8
+
+[move-nonzero.entry_state]
+a = 0x43
+c = 0x12
+
+[move-nonzero.exit_state]
+a = 0x43
+c = 0x12
+pc = 1
+memory = {0xFF12 = [0x43]}
+
+[move-nonzero.program]
+instructions = [
+    0xE2, # ld [c], a
+]
+
+[move-zero]
+cycles = 8
+
+[move-zero.entry_state]
+a = 0x0
+c = 0x12
+memory = {0xFF12 = [0x43]}
+
+[move-zero.exit_state]
+a = 0x0
+c = 0x12
+pc = 1
+memory = {0xFF12 = [0x00]}
+
+[move-zero.program]
+instructions = [
+    0xE2, # ld [c], a
+]

@@ -1,0 +1,31 @@
+[taken]
+cycles = 16
+
+[taken.entry_state]
+
+[taken.exit_state]
+pc = 0x1234
+
+[taken.program]
+instructions = [
+    0xC3, # jp 0x1234
+    0x34,
+    0x12,
+]
+
+[taken2]
+cycles = 16
+
+[taken2.entry_state]
+flags = ['N', 'H', 'Z', 'C']
+
+[taken2.exit_state]
+flags = ['N', 'H', 'Z', 'C']
+pc = 0x1234
+
+[taken2.program]
+instructions = [
+    0xC3, # jp 0x1234
+    0x34,
+    0x12,
+]
