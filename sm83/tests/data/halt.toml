@@ -1,13 +1,78 @@
-[test]
+[test_instr]
 cycles = 4
 exit_reason = "Halt"
 
-[test.entry_state]
+[test_instr.entry_state]
 
-[test.exit_state]
+[test_instr.exit_state]
 pc = 0x01
 
-[test.program]
+[test_instr.program]
+instructions = [
+    0x76, # halt
+]
+
+# Checks that the CPU actually halts
+[test_halted]
+cycles = 200
+exit_reason = "Halt"
+
+[test_halted.entry_state]
+
+[test_halted.exit_state]
+pc = 0x01
+
+[test_halted.program]
+instructions = [
+    0x76, # halt
+]
+
+[test_exit_irq_disabled]
+cycles = 208
+interrupt_triggers = [
+    { cycle = 200, triggers = ["Vblank"] } # Trigger Vblank interrupt at cycle count 200
+]
+exit_reason = "Step"
+
+[test_exit_irq_disabled.entry_state]
+
+[test_exit_irq_disabled.exit_state]
+pc = 0x03
+b = 4
+
+[test_exit_irq_disabled.program]
+instructions = [
+    0x76, # halt
+    0x06, # ld b, 0x04
+    0x04
+]
+
+# Checks that the CPU exits the halt after an interrupt and executes the interrupt handler
+# Note that the halt bug is not implemented on this cpu
+[test_exit_irq_enabled]
+cycles = 220
+interrupt_triggers = [
+    { cycle = 200, triggers = ["Vblank"] } # Trigger Vblank interrupt at cycle count 200
+]
+interrupt_acknowledges = [
+    { cycle = 220, ack = "Vblank" }
+]
+exit_reason = "InterruptTaken"
+
+[test_exit_irq_enabled.entry_state]
+irq_en = true
+pc = 0x1234
+sp = 0x8002
+memory = { 0x8000 = [] }
+
+[test_exit_irq_enabled.exit_state]
+irq_en = false
+pc = 0x40
+sp = 0x8000
+memory = { 0x8000 = [0x35, 0x12] }
+
+[test_exit_irq_enabled.program]
+base = 0x1234
 instructions = [
     0x76, # halt
 ]
