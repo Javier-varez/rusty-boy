@@ -114,7 +114,7 @@ const ALL_INTERRUPTS: Interrupts = Interrupts(
     (Interrupt::Vblank as u8)
         | (Interrupt::Lcd as u8)
         | (Interrupt::Timer as u8)
-        | (Interrupt::Lcd as u8)
+        | (Interrupt::Serial as u8)
         | (Interrupt::Joypad as u8),
 );
 
@@ -139,6 +139,7 @@ impl Interrupts {
     }
 
     /// Returns the interrupt with the highest priority out of all active interrupts (if any)
+    #[must_use]
     pub fn highest_priority(self) -> Option<Interrupt> {
         let trailing_zeros = self.0.trailing_zeros();
         match trailing_zeros {
@@ -152,13 +153,43 @@ impl Interrupts {
     }
 
     /// Acknowledges the given interrupt
+    #[must_use]
     pub fn acknowledge(self, other: Interrupt) -> Self {
         let other: Interrupts = other.into();
         self & !other
     }
 
     /// Returns true if any interrupt is active
+    #[must_use]
     pub fn has_any(self) -> bool {
         self.0 != 0
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    #[test]
+    fn neg_irqs() {
+        let interrupts = Interrupts::new() | Interrupt::Lcd | Interrupt::Serial;
+        assert_eq!(
+            !interrupts,
+            Interrupts::new() | Interrupt::Vblank | Interrupt::Timer | Interrupt::Joypad
+        );
+    }
+
+    #[test]
+    fn all_interrupts() {
+        assert_eq!(ALL_INTERRUPTS.0, 0x1f);
+    }
+
+    #[test]
+    fn ack_irq() {
+        let interrupts = Interrupts::new() | Interrupt::Lcd | Interrupt::Serial;
+
+        assert_eq!(
+            Interrupts::new() | Interrupt::Serial,
+            interrupts.acknowledge(Interrupt::Lcd)
+        );
     }
 }

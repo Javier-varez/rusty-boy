@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use sm83::{
     core::{Cpu, Cycles, ExitReason, Flag, Flags, Registers},
-    interrupts::Interrupts,
+    interrupts::{Interrupt, Interrupts},
     memory::{Address, Memory},
 };
 
@@ -80,6 +80,53 @@ impl Default for StepExitReason {
 }
 
 #[derive(Debug, Deserialize)]
+enum TestInterrupt {
+    Vblank,
+    Lcd,
+    Timer,
+    Serial,
+    Joypad,
+}
+
+impl<T: AsRef<Interrupt>> From<T> for TestInterrupt {
+    fn from(value: T) -> Self {
+        match value.as_ref() {
+            Interrupt::Vblank => Self::Vblank,
+            Interrupt::Lcd => Self::Lcd,
+            Interrupt::Timer => Self::Timer,
+            Interrupt::Serial => Self::Serial,
+            Interrupt::Joypad => Self::Joypad,
+        }
+    }
+}
+
+impl From<&TestInterrupt> for Interrupt {
+    fn from(value: &TestInterrupt) -> Self {
+        match value {
+            TestInterrupt::Vblank => Self::Vblank,
+            TestInterrupt::Lcd => Self::Lcd,
+            TestInterrupt::Timer => Self::Timer,
+            TestInterrupt::Serial => Self::Serial,
+            TestInterrupt::Joypad => Self::Joypad,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TestInterrupts {
+    cycle: usize,
+    triggers: Vec<TestInterrupt>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TestInterruptAck {
+    cycle: usize,
+    ack: TestInterrupt,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Test {
     entry_state: State,
@@ -88,6 +135,10 @@ struct Test {
     cycles: usize,
     #[serde(default)]
     exit_reason: StepExitReason,
+    #[serde(default)]
+    interrupt_triggers: Vec<TestInterrupts>,
+    #[serde(default)]
+    interrupt_acknowledges: Vec<TestInterruptAck>,
 }
 
 fn parse_u16(string: &str) -> u16 {
@@ -144,6 +195,16 @@ fn translate_exit_reason(exit_reason: ExitReason) -> StepExitReason {
     }
 }
 
+fn translate_interrupts(interrupts: &[TestInterrupt]) -> Interrupts {
+    interrupts
+        .into_iter()
+        .map(|i| {
+            let i: Interrupt = i.into();
+            i
+        })
+        .fold(Interrupts::new(), |r, i| r | i)
+}
+
 fn run_test(test_suite_name: &str, tests_str: &str) {
     let tests: std::collections::HashMap<String, Test> =
         toml::from_str(tests_str).expect("Invalid tests");
@@ -169,24 +230,55 @@ fn run_test(test_suite_name: &str, tests_str: &str) {
             flags: translate_flags(&test.entry_state.flags),
         };
 
+        let mut active_interrupts = Interrupts::new();
         let mut executed_cycles = Cycles::new(0);
         let exit_reason = loop {
-            // TODO: control input interrupts
-            let reason = cpu.step(&mut memory_interface, Interrupts::new());
+            let interrupts = if let Some(interrupts) = test
+                .interrupt_triggers
+                .iter()
+                .find(|test_interrupts| Cycles::new(test_interrupts.cycle) == executed_cycles)
+            {
+                translate_interrupts(&interrupts.triggers)
+            } else {
+                Interrupts::new()
+            };
+            active_interrupts = active_interrupts | interrupts;
+            println!("Active interrupts at {executed_cycles:?} = {active_interrupts:?}");
+            let reason = cpu.step(&mut memory_interface, active_interrupts);
 
-            match reason {
-                ExitReason::Halt(cycles)
-                | ExitReason::Step(cycles)
-                | ExitReason::Stop(cycles)
-                | ExitReason::InterruptTaken(cycles, _) => {
-                    executed_cycles = executed_cycles + cycles;
-                    if executed_cycles >= Cycles::new(test.cycles) {
-                        break reason;
-                    }
+            let (step_cycles, ack) = match reason {
+                ExitReason::Halt(cycles) | ExitReason::Step(cycles) | ExitReason::Stop(cycles) => {
+                    (cycles, None)
+                }
+                ExitReason::InterruptTaken(cycles, ack) => {
+                    println!("Active irqs {active_interrupts:?}, ack {ack:?}");
+                    active_interrupts = active_interrupts.acknowledge(ack);
+                    (cycles, Some(ack))
                 }
                 ExitReason::IllegalOpcode => {
                     break reason;
                 }
+            };
+            executed_cycles = executed_cycles + step_cycles;
+            println!("Executed {step_cycles:?}");
+
+            let expected_ack = test
+                .interrupt_acknowledges
+                .iter()
+                .find(|i| Cycles::new(i.cycle) == executed_cycles)
+                .map(|i| {
+                    let i: Interrupt = (&i.ack).into();
+                    i
+                });
+
+            assert_eq!(
+                expected_ack, ack,
+                "interrupt acknowledge mismatch found (expected != ack) at {:?} in test `{}::{}`",
+                executed_cycles, test_suite_name, test_case
+            );
+
+            if executed_cycles >= Cycles::new(test.cycles) {
+                break reason;
             }
         };
 

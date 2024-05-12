@@ -1,0 +1,147 @@
+[unmasked]
+cycles = 20
+interrupt_triggers = [
+    { cycle = 0, triggers = ["Vblank"] } # Trigger Vblank interrupt at cycle count 0
+]
+interrupt_acknowledges = [
+    { cycle = 20, ack = "Vblank" } # Vblank interrupt ackwnoleged at cycle 20
+]
+exit_reason = "InterruptTaken"
+
+[unmasked.entry_state]
+irq_en = true
+pc = 0x1234
+sp = 0x8002
+
+[unmasked.exit_state]
+# interrupts must be disabled on entry
+irq_en = false
+# Vblank is located at 0x40
+pc = 0x40
+sp = 0x8000
+memory = { 0x8000 = [0x34, 0x12] }
+
+[unmasked.program]
+base = 0x1234
+instructions = [
+    0x00, # nop
+]
+
+[masked]
+cycles = 4
+interrupt_triggers = [
+    { cycle = 0, triggers = ["Vblank"] } # Trigger Vblank interrupt at cycle count 0
+]
+exit_reason = "Step"
+
+[masked.entry_state]
+irq_en = false
+pc = 0x1234
+sp = 0x8002
+
+[masked.exit_state]
+irq_en = false
+pc = 0x1235
+sp = 0x8002
+
+[masked.program]
+base = 0x1234
+instructions = [
+    0x00, # nop
+]
+
+[priority]
+cycles = 20
+interrupt_triggers = [
+    { cycle = 0, triggers = ["Vblank", "Lcd"] } # Trigger Vblank and Lcd interrupt at cycle count 0
+]
+interrupt_acknowledges = [
+    { cycle = 20, ack = "Vblank" } # Vblank interrupt ackwnoleged at cycle 20
+]
+exit_reason = "InterruptTaken"
+
+[priority.entry_state]
+irq_en = true
+pc = 0x1234
+sp = 0x8002
+
+[priority.exit_state]
+# interrupts must be disabled on entry
+irq_en = false
+# Vblank is located at 0x40
+pc = 0x40
+sp = 0x8000
+memory = { 0x8000 = [0x34, 0x12] }
+
+[priority.program]
+base = 0x1234
+instructions = [
+    0x00, # nop
+]
+
+[priority2]
+cycles = 20
+interrupt_triggers = [
+    { cycle = 0, triggers = ["Serial", "Lcd"] } # Trigger Serial and Lcd interrupt at cycle count 0
+]
+interrupt_acknowledges = [
+    { cycle = 20, ack = "Lcd" } # Lcd interrupt ackwnoleged at cycle 20
+]
+exit_reason = "InterruptTaken"
+
+[priority2.entry_state]
+irq_en = true
+pc = 0x1234
+sp = 0x8002
+
+[priority2.exit_state]
+# interrupts must be disabled on entry
+irq_en = false
+# Lcd is located at 0x48
+pc = 0x48
+sp = 0x8000
+memory = { 0x8000 = [0x34, 0x12] }
+
+[priority2.program]
+base = 0x1234
+instructions = [
+    0x00, # nop
+]
+
+# The next test expects:
+# - Jump to LCD irq at 0x48, taking 20 cycles
+# - Execute a `ld a, 0xA5` instruction taking 8 cycles
+# - Execute a `reti` instruction taking 16 cycles
+# - Jump to Serial irq at 0x50, taking 20 cycles
+[chained]
+cycles = 64
+interrupt_triggers = [
+    { cycle = 0, triggers = ["Serial", "Lcd"] } # Trigger Serial and Lcd interrupt at cycle count 0
+]
+interrupt_acknowledges = [
+    { cycle = 20, ack = "Lcd" }, # Lcd interrupt ackwnoleged at cycle 20
+    { cycle = 64, ack = "Serial" } # Serial interrupt ackwnoleged at cycle 64
+]
+exit_reason = "InterruptTaken"
+
+[chained.entry_state]
+irq_en = true
+pc = 0x1234
+sp = 0x8002
+# I put interrupt handlers here because `program` is currently not able to handle mutliple memory chunks
+memory = { 0x48 = [0x3E, 0xA5, 0xD9] }
+
+[chained.exit_state]
+a = 0xA5 # Gets set by the Lcd ISR
+# interrupts must be disabled on entry to the Serial irq
+irq_en = false
+# Serial is located at 0x58
+pc = 0x58
+sp = 0x8000
+memory = { 0x48 = [0x3E, 0xA5, 0xD9], 0x8000 = [0x34, 0x12] }
+
+[chained.program]
+base = 0x1234
+instructions = [
+    0x00, # nop
+]
