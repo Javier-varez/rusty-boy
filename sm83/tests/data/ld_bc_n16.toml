@@ -1,0 +1,21 @@
+# Executes a ld bc, n16 instruction
+[test]
+cycles = 12
+
+[test.entry_state]
+b = 0x82
+c = 0x24
+pc = 0x800
+
+[test.exit_state]
+b = 0x12
+c = 0x5A
+pc = 0x803
+
+[test.program]
+base = 0x800
+instructions = [
+    0x01, # ld bc, 0x125A
+    0x5A,
+    0x12,
+]

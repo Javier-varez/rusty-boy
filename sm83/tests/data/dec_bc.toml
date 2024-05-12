@@ -1,0 +1,35 @@
+# Executes a dec bc instruction
+[no_underflow]
+cycles = 8
+
+[no_underflow.entry_state]
+b = 0x12
+c = 0xFF
+
+[no_underflow.exit_state]
+b = 0x12
+c = 0xFE
+pc = 0x1
+
+[no_underflow.program]
+instructions = [
+    0x0B, # dec bc
+]
+
+# Executes a dec bc instruction
+[underflow]
+cycles = 8
+
+[underflow.entry_state]
+b = 0x13
+c = 0x00
+
+[underflow.exit_state]
+b = 0x12
+c = 0xFF
+pc = 0x1
+
+[underflow.program]
+instructions = [
+    0x0B, # dec bc
+]

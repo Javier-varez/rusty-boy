@@ -1,0 +1,15 @@
+# Executes a nop instruction
+[nop]
+cycles = 0x4
+
+[nop.entry_state]
+pc = 0x800
+
+[nop.exit_state]
+pc = 0x801
+
+[nop.program]
+base = 0x800
+instructions = [
+    0x00, # nop
+]
