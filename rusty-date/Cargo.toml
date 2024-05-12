@@ -2,7 +2,14 @@
 name = "rusty-date"
 version = "0.1.0"
 edition = "2021"
-license = "MIT AND Apache-2.0"
+license = "MIT OR Apache-2.0"
+authors = ["Javier Alvarez <javier.alvarez@allthingsembedded.net>"]
+description = "Game Boy emulator for Playdate"
+homepage = "https://github.com/Javier-varez/rusty-boy"
+repository = "https://github.com/Javier-varez/rusty-boy"
+categories = ["embedded", "gaming"]
+keywords = ["embedded", "gameboy", "playdate"]
+readme = "../README.md"
 
 [package.metadata.cargo-xbuild]
 memcpy = false

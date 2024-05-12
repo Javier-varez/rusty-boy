@@ -2,9 +2,14 @@
 name = "ppu"
 version = "0.1.0"
 edition = "2021"
-license = "MIT AND Apache-2.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT OR Apache-2.0"
+authors = ["Javier Alvarez <javier.alvarez@allthingsembedded.net>"]
+description = "Game Boy PPU emulation"
+homepage = "https://github.com/Javier-varez/rusty-boy"
+repository = "https://github.com/Javier-varez/rusty-boy"
+categories = ["embedded", "gaming"]
+keywords = ["embedded", "gameboy", "playdate"]
+readme = "../README.md"
 
 [dependencies]
 sm83 = { path =  "../sm83", version = "0.1.0" }

@@ -2,7 +2,14 @@
 name = "sm83_decoder_macros"
 version = "0.1.0"
 edition = "2021"
-license = "MIT AND Apache-2.0"
+license = "MIT OR Apache-2.0"
+authors = ["Javier Alvarez <javier.alvarez@allthingsembedded.net>"]
+description = "Macros for the SM83 Game Boy CPU emulator"
+homepage = "https://github.com/Javier-varez/rusty-boy"
+repository = "https://github.com/Javier-varez/rusty-boy"
+categories = ["embedded", "gaming"]
+keywords = ["embedded", "gameboy", "playdate"]
+readme = "../README.md"
 
 [lib]
 proc-macro = true
