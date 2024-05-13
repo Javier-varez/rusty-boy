@@ -8,19 +8,19 @@ on performance on `Playdate`, often at the cost of emulation accuracy.
 ## Motivation
 
 I started this project because, even though several other emulators had been written and ported to the
-`Playdate` handheld console, I found they ran staggeringly slow to the point that they were unplayable on
+`Playdate` handheld console, I found they ran staggeringly slow, to the point that they were unplayable on
 a real device, specially in revision B of the `Playdate`.
 
 ## Features
 
-- Emulates of most `DMG` `Game Boy` features.
-- Achieves 70 % to 100 % of the framerate in the `Playdate`, depending on the game and kind of load it requires.
-- Upscales the frame to the size of the `Playdate`, and applies dithering to emulate the gray shades of the
+- Emulates most of the `DMG` `Game Boy` features.
+- Achieves 70 % to 100 % of the framerate in the `Playdate`, depending on the game and the kind of load it requires.
+- Upscales the frame to the size of the `Playdate` screen, and applies dithering to emulate the gray shades of the
 original `DMG` Game Boy.
 - Emulates `MBC1`, `rom-only` and `MBC3` cartridges. Adding support for other mappers should be easy to do.
-- Backs up cartridge ram on exit (no save states).
-- Does not support for `GBC` games, in order to avoid complexity, and because the `Playdate` has a monochrome
-display, so it wouldn't be that useful.
+- Backs up cartridge RAM on exit (does not actually implement save states).
+- In order to avoid complexity, it does not support `GBC` games. And because the `Playdate` has a monochrome
+display, it wouldn't be that useful.
 - Does not implement sound emulation. I hope to work on this in the future, but I suspect it will be quite
 computationally intensive to run.
 - Passes all CPU, time and interrupt blargg tests.
@@ -143,9 +143,9 @@ By using this software you accept these terms and conditions.
 Ok, I will assume from this point onwards that you have legally obtained your cartridge dumps. If so,
 to upload them to the Playdate follow these instructions:
 
-- Connect your Playdate via USB to your computer. Navigate to `Settings-> System -> Reboot to Data Disk`
+- Connect your Playdate via USB to your computer. Navigate to `Settings -> System -> Reboot to Data Disk`
 on the Playdate and wait for the USB MSD device to show up as a disk on your compuer.
 - Once the disk is mounted, drag and drop the cartrige ROMs you want to play to the `Data/Rusty Date`
-folder. All ROMs must end with the `.gb` extension in order to be detected by `Rusty Date`.
+directory. All ROMs must end with the `.gb` extension in order to be detected by `Rusty Date`.
 - Eject the disk and wait until the Playdate reboots.
 - You can now play your games! They should appear in a list when you first open the `Rusty Date` game.
