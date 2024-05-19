@@ -123,7 +123,7 @@ fn attempt_restore_save_file(rusty_boy: &mut RustyBoy, rom_path: &Path) -> anyho
 }
 
 fn save_file(rom_path: &Path, data: &[u8]) -> anyhow::Result<()> {
-    let save_file_path = rom_path.with_extension(".save");
+    let save_file_path = rom_path.with_extension("save");
     std::fs::write(&save_file_path, data)?;
     Ok(())
 }
