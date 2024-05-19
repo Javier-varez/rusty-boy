@@ -69,6 +69,11 @@ jobs:
         tar -xf PlaydateSDK-2.4.2.tar.gz
     - run: PLAYDATE_SDK_PATH=${{ github.workspace }}/PlaydateSDK-2.4.2 crank build --device --release
       working-directory: rusty-date
+    - name: Archive rusty-date
+      uses: actions/upload-artifact@v4
+      with:
+        name: rusty-date
+        path: rusty-date/target/Rusty Date.pdx
 
   cargo-deny:
     runs-on: ubuntu-latest
