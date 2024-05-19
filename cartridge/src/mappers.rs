@@ -10,6 +10,7 @@ use alloc::vec::Vec;
 
 mod mbc1;
 mod mbc3;
+mod mbc5;
 mod rom_only;
 
 /// All mappers must implement this trait. Allows accessing memory-mapped ROM, RAM and any
@@ -58,6 +59,9 @@ pub fn new_mapper(data: Vec<u8>) -> Result<Box<dyn Mapper>, super::Error> {
         }
         CartridgeType::Mbc3 | CartridgeType::Mbc3Ram | CartridgeType::Mbc3RamBattery => {
             Box::new(mbc3::Mbc3::new(data, ram_size))
+        }
+        CartridgeType::Mbc5 | CartridgeType::Mbc5Ram | CartridgeType::Mbc5RamBattery => {
+            Box::new(mbc5::Mbc5::new(data, ram_size))
         }
         v => {
             // Other cartridge types are currently unsupported
