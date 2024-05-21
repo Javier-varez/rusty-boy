@@ -2,10 +2,7 @@
 //! and internal CPU flags.
 
 use crate::{
-    decoder::{
-        self, AddressingMode, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairStack,
-        RegisterPairs, ResetTarget,
-    },
+    decoder::{self, AddressingMode, Bit, Condition, OpCode, Register, RegisterPair, ResetTarget},
     interrupts::{Interrupt, Interrupts},
     memory::Memory,
 };
@@ -491,38 +488,26 @@ impl Cpu {
         *target = value;
     }
 
-    const fn get_reg_pair(&self, reg: RegisterPair) -> u16 {
+    fn get_reg_pair(&mut self, reg: RegisterPair) -> u16 {
         let regs = self.get_regs();
         let (hi, lo) = match reg {
             RegisterPair::BC => (regs.b_reg, regs.c_reg),
             RegisterPair::DE => (regs.d_reg, regs.e_reg),
-            RegisterPair::HL => (regs.h_reg, regs.l_reg),
+            RegisterPair::HL | RegisterPair::HLINC | RegisterPair::HLDEC => {
+                (regs.h_reg, regs.l_reg)
+            }
             RegisterPair::SP => {
                 return regs.sp_reg;
             }
-        };
-        ((hi as u16) << 8) | (lo as u16)
-    }
-
-    fn get_reg_pairs(&mut self, reg: RegisterPairs) -> u16 {
-        let regs = self.get_regs();
-        let (hi, lo) = match reg {
-            RegisterPairs::BC => (regs.b_reg, regs.c_reg),
-            RegisterPairs::DE => (regs.d_reg, regs.e_reg),
-            RegisterPairs::HL | RegisterPairs::HLINC | RegisterPairs::HLDEC => {
-                (regs.h_reg, regs.l_reg)
-            }
-            RegisterPairs::SP => {
-                return regs.sp_reg;
-            }
+            RegisterPair::AF => (regs.a_reg, regs.flags.0),
         };
         let value = ((hi as u16) << 8) | (lo as u16);
 
         match reg {
-            RegisterPairs::HLINC => {
+            RegisterPair::HLINC => {
                 self.set_reg_pair(RegisterPair::HL, value.wrapping_add(1));
             }
-            RegisterPairs::HLDEC => {
+            RegisterPair::HLDEC => {
                 self.set_reg_pair(RegisterPair::HL, value.wrapping_sub(1));
             }
             _ => {}
@@ -535,51 +520,14 @@ impl Cpu {
         let (hi, lo) = match reg {
             RegisterPair::BC => (&mut regs.b_reg, &mut regs.c_reg),
             RegisterPair::DE => (&mut regs.d_reg, &mut regs.e_reg),
-            RegisterPair::HL => (&mut regs.h_reg, &mut regs.l_reg),
+            RegisterPair::HL | RegisterPair::HLINC | RegisterPair::HLDEC => {
+                (&mut regs.h_reg, &mut regs.l_reg)
+            }
             RegisterPair::SP => {
                 regs.sp_reg = value;
                 return;
             }
-        };
-        *hi = ((value >> 8) & 0xff) as u8;
-        *lo = (value & 0xff) as u8;
-    }
-
-    fn set_reg_pairs(&mut self, reg: RegisterPairs, value: u16) {
-        let regs = self.get_mut_regs();
-        let (hi, lo) = match reg {
-            RegisterPairs::BC => (&mut regs.b_reg, &mut regs.c_reg),
-            RegisterPairs::DE => (&mut regs.d_reg, &mut regs.e_reg),
-            RegisterPairs::HL | RegisterPairs::HLINC | RegisterPairs::HLDEC => {
-                (&mut regs.h_reg, &mut regs.l_reg)
-            }
-            RegisterPairs::SP => {
-                regs.sp_reg = value;
-                return;
-            }
-        };
-        *hi = ((value >> 8) & 0xff) as u8;
-        *lo = (value & 0xff) as u8;
-    }
-
-    const fn get_reg_pair_stack(&self, reg: RegisterPairStack) -> u16 {
-        let regs = self.get_regs();
-        let (hi, lo) = match reg {
-            RegisterPairStack::BC => (regs.b_reg, regs.c_reg),
-            RegisterPairStack::DE => (regs.d_reg, regs.e_reg),
-            RegisterPairStack::HL => (regs.h_reg, regs.l_reg),
-            RegisterPairStack::AF => (regs.a_reg, regs.flags.0),
-        };
-        ((hi as u16) << 8) | (lo as u16)
-    }
-
-    fn set_reg_pair_stack(&mut self, reg: RegisterPairStack, value: u16) {
-        let regs = self.get_mut_regs();
-        let (hi, lo) = match reg {
-            RegisterPairStack::BC => (&mut regs.b_reg, &mut regs.c_reg),
-            RegisterPairStack::DE => (&mut regs.d_reg, &mut regs.e_reg),
-            RegisterPairStack::HL => (&mut regs.h_reg, &mut regs.l_reg),
-            RegisterPairStack::AF => {
+            RegisterPair::AF => {
                 let (hi, lo) = (&mut regs.a_reg, &mut regs.flags);
                 *hi = ((value >> 8) & 0xff) as u8;
                 *lo = ((value & 0xf0) as u8).into(); // lo-bits are hardcoded to 0
@@ -685,7 +633,7 @@ impl Cpu {
             AddressingMode::Register(r) => (Cycles::new(0), self.get_reg(r)),
             AddressingMode::Immediate => (Cycles::new(4), self.read_8_bit_immediate(memory)),
             AddressingMode::IndirectRegister(r) => {
-                let addr = self.get_reg_pairs(r);
+                let addr = self.get_reg_pair(r);
                 (Cycles::new(4), memory.read(addr))
             }
             AddressingMode::IndirectZeroPageRegister(r) => {
@@ -716,7 +664,7 @@ impl Cpu {
                 Cycles::new(0)
             }
             AddressingMode::IndirectRegister(r) => {
-                let addr = self.get_reg_pairs(r);
+                let addr = self.get_reg_pair(r);
                 memory.write(addr, value);
                 Cycles::new(4)
             }
@@ -745,7 +693,7 @@ impl Cpu {
         mode: AddressingMode,
     ) -> (Cycles, u16) {
         match mode {
-            AddressingMode::RegisterPair(r) => (Cycles::new(0), self.get_reg_pairs(r)),
+            AddressingMode::RegisterPair(r) => (Cycles::new(0), self.get_reg_pair(r)),
             AddressingMode::Immediate16 => (Cycles::new(8), self.read_16_bit_immediate(memory)),
             _ => unreachable!(),
         }
@@ -759,7 +707,7 @@ impl Cpu {
     ) -> Cycles {
         match mode {
             AddressingMode::RegisterPair(r) => {
-                self.set_reg_pairs(r, value);
+                self.set_reg_pair(r, value);
                 Cycles::new(0)
             }
             AddressingMode::IndirectImmediate => {
@@ -1101,11 +1049,11 @@ impl Cpu {
             }
             OpCode::Pop(reg) => {
                 let value = self.stack_pop(memory);
-                self.set_reg_pair_stack(reg, value);
+                self.set_reg_pair(reg, value);
                 Cycles::new(12)
             }
             OpCode::Push(reg) => {
-                let value = self.get_reg_pair_stack(reg);
+                let value = self.get_reg_pair(reg);
                 self.stack_push(memory, value);
                 Cycles::new(16)
             }
