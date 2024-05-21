@@ -3,7 +3,7 @@ use core::slice::Iter;
 
 use cartridge::header::CartridgeHeader;
 
-use sm83::decoder::{Bit, Condition, Register, RegisterPairStack, RegisterPairs, ResetTarget};
+use sm83::decoder::{Bit, Condition, Register, RegisterPair, ResetTarget};
 
 use sm83::memory::Memory;
 
@@ -78,12 +78,12 @@ pub fn disassemble_single_inst(
 
 #[derive(Debug, Clone, Copy)]
 pub enum AddressingMode {
-    IndirectRegister(RegisterPairs),
+    IndirectRegister(RegisterPair),
     IndirectZeroPageRegister(Register),
     IndirectImmediate(u16),
     IndirectZeroPageImmediate(u8),
     Register(Register),
-    RegisterPair(RegisterPairs),
+    RegisterPair(RegisterPair),
     Immediate(u8),
     Immediate16(u16),
 }
@@ -143,8 +143,8 @@ pub enum Instruction {
     JpHl,                                  // jp HL
     CallImm(Option<Condition>, u16),       // call imm16, optional condition
     Reset(ResetTarget),                    // reset target
-    Pop(RegisterPairStack),                // pop RegisterPairStack
-    Push(RegisterPairStack),               // push RegisterPairStack
+    Pop(RegisterPair),                     // pop
+    Push(RegisterPair),                    // push
     AddSpImm(i8),                          // add SP, n8
     Ld16HlSpImm(i8),                       // ld HL, SP + n8
     Di,                                    // di
@@ -187,23 +187,15 @@ impl Instruction {
         }
     }
 
-    fn reg_pair_to_repr(reg: RegisterPairs) -> &'static str {
+    fn reg_pair_to_repr(reg: RegisterPair) -> &'static str {
         match reg {
-            RegisterPairs::BC => "BC",
-            RegisterPairs::DE => "DE",
-            RegisterPairs::HL => "HL",
-            RegisterPairs::SP => "SP",
-            RegisterPairs::HLINC => "HL+",
-            RegisterPairs::HLDEC => "HL-",
-        }
-    }
-
-    fn reg_pair_stack_to_repr(reg: RegisterPairStack) -> &'static str {
-        match reg {
-            RegisterPairStack::BC => "BC",
-            RegisterPairStack::DE => "DE",
-            RegisterPairStack::HL => "HL",
-            RegisterPairStack::AF => "AF",
+            RegisterPair::BC => "BC",
+            RegisterPair::DE => "DE",
+            RegisterPair::HL => "HL",
+            RegisterPair::SP => "SP",
+            RegisterPair::HLINC => "HL+",
+            RegisterPair::HLDEC => "HL-",
+            RegisterPair::AF => "AF",
         }
     }
 
@@ -390,10 +382,10 @@ impl core::fmt::Display for Instruction {
                 write!(f, "rst {}", Self::reset_target_to_repr(*target))
             }
             Instruction::Pop(reg) => {
-                write!(f, "pop {}", Self::reg_pair_stack_to_repr(*reg))
+                write!(f, "pop {}", Self::reg_pair_to_repr(*reg))
             }
             Instruction::Push(reg) => {
-                write!(f, "push {}", Self::reg_pair_stack_to_repr(*reg))
+                write!(f, "push {}", Self::reg_pair_to_repr(*reg))
             }
             Instruction::Di => {
                 write!(f, "di")
