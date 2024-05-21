@@ -22,108 +22,105 @@
 
 use sm83_decoder_macros::generate_decoder_tables;
 
+#[derive(Debug, Clone, Copy)]
+pub enum AddressingMode {
+    IndirectRegister(RegisterPairs),
+    IndirectZeroPageRegister(Register),
+    IndirectImmediate,
+    IndirectZeroPageImmediate,
+    Register(Register),
+    RegisterPair(RegisterPairs),
+    Immediate,
+    Immediate16,
+}
+
 /// Opcodes of the CPU.
 #[derive(Debug, Clone, Copy)]
 pub enum OpCode {
-    Ld8RegReg(Register, Register),                 // ld Register, Register
-    Ld8RegImm(Register),                           // ld Register, n8
-    Ld8RegInd(Register, RegisterPair),             // ld Register, [RegisterPair]
-    Ld8IndReg(RegisterPair, Register),             // ld [RegisterPair], Register
-    Ld8IndImm(RegisterPair),                       // ld [RegisterPair], n8
-    Ld8IndAcc(RegisterPairMem),                    // ld [RegisterPairMem], A
-    Ld8AccInd(RegisterPairMem),                    // ld A, [RegisterPairMem]
-    Ld8ZeroPageCAcc,                               // ld [C], A
-    Ld8AccZeroPageC,                               // ld A, [C]
-    Ld8ZeroPageImmAcc,                             // ld [n8], A
-    Ld8AccZeroPageImm,                             // ld A, [n8]
-    Ld8IndImmAcc,                                  // ld [n16], A
-    Ld8AccIndImm,                                  // ld A, [n16]
-    Ld16RegImm(RegisterPair),                      // ld RegisterPair, n16
-    Ld16IndImmSp,                                  // ld [a16], SP
-    Ld16HlSpImm,                                   // ld HL, SP + n8
-    Ld16SpHl,                                      // ld SP, HL
-    Halt,                                          // halt
-    AddRegReg(Register, Register),                 // add Register, Register
-    SubRegReg(Register, Register),                 // sub Register, Register
-    AndRegReg(Register, Register),                 // and Register, Register
-    OrRegReg(Register, Register),                  // or Register, Register
-    AdcRegReg(Register, Register),                 // adc Register, Register
-    SbcRegReg(Register, Register),                 // sbc Register, Register
-    XorRegReg(Register, Register),                 // xor Register, Register
-    CpRegReg(Register, Register),                  // cp Register, Register
-    AddRegPairRegPair(RegisterPair, RegisterPair), // add RegisterPair, RegisterPair
-    AddAccImm,                                     // add A, n8
-    AdcAccImm,                                     // adc A, n8
-    SubAccImm,                                     // sub A, n8
-    SbcAccImm,                                     // sbc A, n8
-    AndAccImm,                                     // and A, n8
-    XorAccImm,                                     // xor A, n8
-    OrAccImm,                                      // or A, n8
-    CpAccImm,                                      // cp A, n8
-    AddSpImm,                                      // add SP, n8
-    AddAccHlInd,                                   // add A, [HL]
-    AdcAccHlInd,                                   // adc A, [HL]
-    SubAccHlInd,                                   // sub A, [HL]
-    SbcAccHlInd,                                   // sbc A, [HL]
-    AndAccHlInd,                                   // and A, [HL]
-    XorAccHlInd,                                   // xor A, [HL]
-    OrAccHlInd,                                    // or A, [HL]
-    CpAccHlInd,                                    // cp A, [HL]
-    IncReg(Register),                              // inc Register
-    DecReg(Register),                              // dec Register
-    IncRegPair(RegisterPair),                      // inc RegisterPair
-    DecRegPair(RegisterPair),                      // inc RegisterPair
-    IncIndHl,                                      // inc [HL]
-    DecIndHl,                                      // dec [HL]
-    Prefix,                                        // prefix
-    Nop,                                           // nop
-    Daa,                                           // daa
-    Cpl,                                           // cpl
-    Scf,                                           // scf
-    Ccf,                                           // ccf
-    JrImm,                                         // jr imm8
-    JrCondImm(Condition),                          // jr cond, imm8
-    Stop,                                          // stop
-    RetCond(Condition),                            // ret cond
-    Ret,                                           // ret
-    Reti,                                          // reti
-    JpCondImm(Condition),                          // jp cond, imm16
-    JpImm,                                         // jp imm16
-    JpHl,                                          // jp HL
-    CallCondImm(Condition),                        // call cond, imm16
-    CallImm,                                       // call imm16
-    Reset(ResetTarget),                            // reset target
-    Pop(RegisterPairStack),                        // pop RegisterPairStack
-    Push(RegisterPairStack),                       // push RegisterPairStack
-    Di,                                            // di
-    Ei,                                            // ei
-    Illegal,                                       // Illegal
-    Rlca,                                          // rlca
-    Rrca,                                          // rrca
-    Rla,                                           // rla Register
-    Rra,                                           // rra Register
-    RlcReg(Register),                              // rlc Register
-    RrcReg(Register),                              // rrc Register
-    RlReg(Register),                               // rl Register
-    RrReg(Register),                               // rr Register
-    SlaReg(Register),                              // sla Register
-    SraReg(Register),                              // sra Register
-    SwapReg(Register),                             // swap Register
-    SrlReg(Register),                              // srl Register
-    Bit(Bit, Register),                            // bit #bit, Register
-    Res(Bit, Register),                            // res #bit, Register
-    Set(Bit, Register),                            // set #bit, Register
-    RlcHlInd,                                      // rlc [HL]
-    RrcHlInd,                                      // rrc [HL]
-    RlHlInd,                                       // rl [HL]
-    RrHlInd,                                       // rr [HL]
-    SlaHlInd,                                      // sla [HL]
-    SraHlInd,                                      // sra [HL]
-    SwapHlInd,                                     // swap [HL]
-    SrlHlInd,                                      // srl [HL]
-    BitHlInd(Bit),                                 // bit #bit, [HL]
-    ResHlInd(Bit),                                 // srl #bit, [HL]
-    SetHlInd(Bit),                                 // srl #bit, [HL]
+    Ld8(AddressingMode, AddressingMode),   // ld 8-bit instruction
+    Ld16(AddressingMode, AddressingMode),  // ld 16-bit instruction
+    Add8(AddressingMode, AddressingMode),  // add 8-bit instruction
+    Sub8(AddressingMode, AddressingMode),  // sub 8-bit instruction
+    And8(AddressingMode, AddressingMode),  // and 8-bit instruction
+    Or8(AddressingMode, AddressingMode),   // or 8-bit instruction
+    Adc8(AddressingMode, AddressingMode),  // adc 8-bit instruction
+    Sbc8(AddressingMode, AddressingMode),  // sbc 8-bit instruction
+    Xor8(AddressingMode, AddressingMode),  // xor 8-bit instruction
+    Cp8(AddressingMode, AddressingMode),   // cp 8-bit instruction
+    Add16(AddressingMode, AddressingMode), // add 16-bit instruction
+    Inc8(AddressingMode),                  // inc 8-bit
+    Dec8(AddressingMode),                  // dec 8-bit
+    Inc16(AddressingMode),                 // inc 16-bit
+    Dec16(AddressingMode),                 // dec 16-bit
+    JrImm(Option<Condition>),              // jr 8-bit immediate, with or without condition
+    Ret(Option<Condition>),                // ret with optional condition
+    Reti,                                  // reti
+    JpImm(Option<Condition>),              // jp imm16, optional condition
+    JpHl,                                  // jp HL
+    CallImm(Option<Condition>),            // call imm16, optional condition
+    Reset(ResetTarget),                    // reset target
+    Pop(RegisterPairStack),                // pop RegisterPairStack
+    Push(RegisterPairStack),               // push RegisterPairStack
+    AddSpImm,                              // add SP, n8
+    Ld16HlSpImm,                           // ld HL, SP + n8
+    Di,                                    // di
+    Ei,                                    // ei
+    Halt,                                  // halt
+    Prefix,                                // prefix
+    Nop,                                   // nop
+    Rlca,                                  // rlca
+    Rrca,                                  // rrca
+    Rla,                                   // rla
+    Rra,                                   // rra
+    Daa,                                   // daa
+    Cpl,                                   // cpl
+    Scf,                                   // scf
+    Ccf,                                   // ccf
+    Stop,                                  // stop
+    Rlc(AddressingMode),                   // rlc
+    Rrc(AddressingMode),                   // rrc
+    Rl(AddressingMode),                    // rl
+    Rr(AddressingMode),                    // rr
+    Sla(AddressingMode),                   // sla
+    Sra(AddressingMode),                   // sra
+    Swap(AddressingMode),                  // swap
+    Srl(AddressingMode),                   // srl
+    Bit(Bit, AddressingMode),              // bit #bit
+    Res(Bit, AddressingMode),              // res #bit
+    Set(Bit, AddressingMode),              // set #bit
+    Illegal,                               // Illegal
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum RegisterPairs {
+    BC,
+    DE,
+    HL,
+    SP,
+    HLINC,
+    HLDEC,
+}
+
+impl RegisterPair {
+    pub const fn into_generalized(self) -> RegisterPairs {
+        match self {
+            RegisterPair::BC => RegisterPairs::BC,
+            RegisterPair::DE => RegisterPairs::DE,
+            RegisterPair::HL => RegisterPairs::HL,
+            RegisterPair::SP => RegisterPairs::SP,
+        }
+    }
+}
+
+impl RegisterPairMem {
+    pub const fn into_generalized(self) -> RegisterPairs {
+        match self {
+            RegisterPairMem::BC => RegisterPairs::BC,
+            RegisterPairMem::DE => RegisterPairs::DE,
+            RegisterPairMem::HLINC => RegisterPairs::HLINC,
+            RegisterPairMem::HLDEC => RegisterPairs::HLDEC,
+        }
+    }
 }
 
 // r => destination reg
@@ -186,31 +183,31 @@ generate_decoder_tables! {
         }
     }
     DECODER_TABLE: [OpCode; 256] {
-        [r: Register, R: Register] "01rrrRRR" => { OpCode::Ld8RegReg(#r, #R) },
-        [r: Register] "01rrr110" => { OpCode::Ld8RegInd(#r, RegisterPair::HL) },
-        [R: Register] "01110RRR" => { OpCode::Ld8IndReg(RegisterPair::HL, #R) },
+        [r: Register, R: Register] "01rrrRRR" => { OpCode::Ld8(AddressingMode::Register(#r), AddressingMode::Register(#R)) },
+        [r: Register] "01rrr110" => { OpCode::Ld8(AddressingMode::Register(#r), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [R: Register] "01110RRR" => { OpCode::Ld8(AddressingMode::IndirectRegister(RegisterPair::HL.into_generalized()), AddressingMode::Register(#R)) },
         [] "01110110" => { OpCode::Halt },
-        [r: Register] "00rrr110" => { OpCode::Ld8RegImm(#r) },
-        [] "00110110" => { OpCode::Ld8IndImm(RegisterPair::HL) },
-        [r: Register] "10000rrr" => { OpCode::AddRegReg(Register::A, #r) },
-        [r: Register] "10010rrr" => { OpCode::SubRegReg(Register::A, #r) },
-        [r: Register] "10100rrr" => { OpCode::AndRegReg(Register::A, #r) },
-        [r: Register] "10110rrr" => { OpCode::OrRegReg(Register::A, #r) },
-        [r: Register] "10001rrr" => { OpCode::AdcRegReg(Register::A, #r) },
-        [r: Register] "10011rrr" => { OpCode::SbcRegReg(Register::A, #r) },
-        [r: Register] "10101rrr" => { OpCode::XorRegReg(Register::A, #r) },
-        [r: Register] "10111rrr" => { OpCode::CpRegReg(Register::A, #r) },
-        [R: Register] "00RRR100" => { OpCode::IncReg(#R) },
-        [R: Register] "00RRR101" => { OpCode::DecReg(#R) },
+        [r: Register] "00rrr110" => { OpCode::Ld8(AddressingMode::Register(#r), AddressingMode::Immediate) },
+        [] "00110110" => { OpCode::Ld8(AddressingMode::IndirectRegister(RegisterPair::HL.into_generalized()), AddressingMode::Immediate) },
+        [r: Register] "10000rrr" => { OpCode::Add8(AddressingMode::Register(Register::A), AddressingMode::Register(#r)) },
+        [r: Register] "10010rrr" => { OpCode::Sub8(AddressingMode::Register(Register::A), AddressingMode::Register(#r)) },
+        [r: Register] "10100rrr" => { OpCode::And8(AddressingMode::Register(Register::A), AddressingMode::Register(#r)) },
+        [r: Register] "10110rrr" => { OpCode::Or8(AddressingMode::Register(Register::A), AddressingMode::Register(#r)) },
+        [r: Register] "10001rrr" => { OpCode::Adc8(AddressingMode::Register(Register::A), AddressingMode::Register(#r)) },
+        [r: Register] "10011rrr" => { OpCode::Sbc8(AddressingMode::Register(Register::A), AddressingMode::Register(#r)) },
+        [r: Register] "10101rrr" => { OpCode::Xor8(AddressingMode::Register(Register::A), AddressingMode::Register(#r)) },
+        [r: Register] "10111rrr" => { OpCode::Cp8(AddressingMode::Register(Register::A), AddressingMode::Register(#r)) },
+        [R: Register] "00RRR100" => { OpCode::Inc8(AddressingMode::Register(#R)) },
+        [R: Register] "00RRR101" => { OpCode::Dec8(AddressingMode::Register(#R)) },
         [] "11001011" => { OpCode::Prefix },
         [] "00000000" => { OpCode::Nop },
-        [R: RegisterPair] "00RR0001" => { OpCode::Ld16RegImm(#R) },
-        [R: RegisterPairMem] "00RR0010" => { OpCode::Ld8IndAcc(#R) },
-        [R: RegisterPairMem] "00RR1010" => { OpCode::Ld8AccInd(#R) },
-        [] "00001000" => { OpCode::Ld16IndImmSp },
-        [R: RegisterPair] "00RR0011" => { OpCode::IncRegPair(#R) },
-        [R: RegisterPair] "00RR1011" => { OpCode::DecRegPair(#R) },
-        [R: RegisterPair] "00RR1001" => { OpCode::AddRegPairRegPair(RegisterPair::HL, #R) },
+        [R: RegisterPair] "00RR0001" => { OpCode::Ld16(AddressingMode::RegisterPair((#R).into_generalized()), AddressingMode::Immediate16) },
+        [R: RegisterPairMem] "00RR0010" => { OpCode::Ld8(AddressingMode::IndirectRegister((#R).into_generalized()), AddressingMode::Register(Register::A)) },
+        [R: RegisterPairMem] "00RR1010" => { OpCode::Ld8(AddressingMode::Register(Register::A),AddressingMode::IndirectRegister((#R).into_generalized())) },
+        [] "00001000" => { OpCode::Ld16(AddressingMode::IndirectImmediate, AddressingMode::RegisterPair(RegisterPairs::SP)) },
+        [R: RegisterPair] "00RR0011" => { OpCode::Inc16(AddressingMode::RegisterPair((#R).into_generalized())) },
+        [R: RegisterPair] "00RR1011" => { OpCode::Dec16(AddressingMode::RegisterPair((#R).into_generalized())) },
+        [R: RegisterPair] "00RR1001" => { OpCode::Add16(AddressingMode::RegisterPair(RegisterPairs::HL), AddressingMode::RegisterPair((#R).into_generalized())) },
         [] "00000111" => { OpCode::Rlca },
         [] "00001111" => { OpCode::Rrca },
         [] "00010111" => { OpCode::Rla },
@@ -219,55 +216,53 @@ generate_decoder_tables! {
         [] "00101111" => { OpCode::Cpl },
         [] "00110111" => { OpCode::Scf },
         [] "00111111" => { OpCode::Ccf },
-        [] "00011000" => { OpCode::JrImm },
-        [c: Condition] "001cc000" => { OpCode::JrCondImm(#c) },
+        [] "00011000" => { OpCode::JrImm(None) },
+        [c: Condition] "001cc000" => { OpCode::JrImm(Some(#c)) },
         [] "00010000" => { OpCode::Stop },
-        [] "11000110" => { OpCode::AddAccImm },
-        [] "11001110" => { OpCode::AdcAccImm },
-        [] "11010110" => { OpCode::SubAccImm },
-        [] "11011110" => { OpCode::SbcAccImm },
-        [] "11100110" => { OpCode::AndAccImm },
-        [] "11101110" => { OpCode::XorAccImm },
-        [] "11110110" => { OpCode::OrAccImm },
-        [] "11111110" => { OpCode::CpAccImm },
-        [c: Condition] "110cc000" => { OpCode::RetCond(#c) },
-        [] "11001001" => { OpCode::Ret },
+        [] "11000110" => { OpCode::Add8(AddressingMode::Register(Register::A), AddressingMode::Immediate) },
+        [] "11001110" => { OpCode::Adc8(AddressingMode::Register(Register::A), AddressingMode::Immediate) },
+        [] "11010110" => { OpCode::Sub8(AddressingMode::Register(Register::A), AddressingMode::Immediate) },
+        [] "11011110" => { OpCode::Sbc8(AddressingMode::Register(Register::A), AddressingMode::Immediate) },
+        [] "11100110" => { OpCode::And8(AddressingMode::Register(Register::A), AddressingMode::Immediate) },
+        [] "11101110" => { OpCode::Xor8(AddressingMode::Register(Register::A), AddressingMode::Immediate) },
+        [] "11110110" => { OpCode::Or8(AddressingMode::Register(Register::A), AddressingMode::Immediate) },
+        [] "11111110" => { OpCode::Cp8(AddressingMode::Register(Register::A), AddressingMode::Immediate) },
+        [] "11001001" => { OpCode::Ret(None) },
+        [c: Condition] "110cc000" => { OpCode::Ret(Some(#c)) },
         [] "11011001" => { OpCode::Reti },
-        [c: Condition] "110cc010" => { OpCode::JpCondImm(#c) },
-        [] "11000011" => { OpCode::JpImm },
+        [c: Condition] "110cc010" => { OpCode::JpImm(Some(#c)) },
+        [] "11000011" => { OpCode::JpImm(None) },
         [] "11101001" => { OpCode::JpHl },
-        [c: Condition] "110cc100" => { OpCode::CallCondImm(#c) },
-        [] "11001101" => { OpCode::CallImm },
+        [c: Condition] "110cc100" => { OpCode::CallImm(Some(#c)) },
+        [] "11001101" => { OpCode::CallImm(None) },
         [t: ResetTarget] "11ttt111" => { OpCode::Reset(#t) },
         [r: RegisterPairStack] "11rr0001" => { OpCode::Pop(#r) },
         [r: RegisterPairStack] "11rr0101" => { OpCode::Push(#r) },
-        [] "11100010" => { OpCode::Ld8ZeroPageCAcc },
-        [] "11110010" => { OpCode::Ld8AccZeroPageC },
-        [] "11100000" => { OpCode::Ld8ZeroPageImmAcc },
-        [] "11110000" => { OpCode::Ld8AccZeroPageImm },
-        [] "11101010" => { OpCode::Ld8IndImmAcc },
-        [] "11111010" => { OpCode::Ld8AccIndImm },
+        [] "11100010" => { OpCode::Ld8(AddressingMode::IndirectZeroPageRegister(Register::C), AddressingMode::Register(Register::A)) },
+        [] "11110010" => { OpCode::Ld8( AddressingMode::Register(Register::A), AddressingMode::IndirectZeroPageRegister(Register::C)) },
+        [] "11100000" => { OpCode::Ld8(AddressingMode::IndirectZeroPageImmediate, AddressingMode::Register(Register::A)) },
+        [] "11110000" => { OpCode::Ld8(AddressingMode::Register(Register::A), AddressingMode::IndirectZeroPageImmediate) },
+        [] "11101010" => { OpCode::Ld8(AddressingMode::IndirectImmediate, AddressingMode::Register(Register::A)) },
+        [] "11111010" => { OpCode::Ld8(AddressingMode::Register(Register::A), AddressingMode::IndirectImmediate) },
         [] "11101000" => { OpCode::AddSpImm },
         [] "11111000" => { OpCode::Ld16HlSpImm },
-        [] "11111001" => { OpCode::Ld16SpHl },
+        [] "11111001" => { OpCode::Ld16(AddressingMode::RegisterPair(RegisterPairs::SP), AddressingMode::RegisterPair(RegisterPairs::HL)) },
         [] "11110011" => { OpCode::Di },
         [] "11111011" => { OpCode::Ei },
-        [] "00110100" => { OpCode::IncIndHl },
-        [] "00110101" => { OpCode::DecIndHl },
-        [] "10000110" => { OpCode::AddAccHlInd },
-        [] "10001110" => { OpCode::AdcAccHlInd },
-        [] "10010110" => { OpCode::SubAccHlInd },
-        [] "10011110" => { OpCode::SbcAccHlInd },
-        [] "10100110" => { OpCode::AndAccHlInd },
-        [] "10101110" => { OpCode::XorAccHlInd },
-        [] "10110110" => { OpCode::OrAccHlInd },
-        [] "10111110" => { OpCode::CpAccHlInd },
-
+        [] "00110100" => { OpCode::Inc8(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "00110101" => { OpCode::Dec8(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "10000110" => { OpCode::Add8(AddressingMode::Register(Register::A), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "10001110" => { OpCode::Adc8(AddressingMode::Register(Register::A), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "10010110" => { OpCode::Sub8(AddressingMode::Register(Register::A), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "10011110" => { OpCode::Sbc8(AddressingMode::Register(Register::A), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "10100110" => { OpCode::And8(AddressingMode::Register(Register::A), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "10101110" => { OpCode::Xor8(AddressingMode::Register(Register::A), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "10110110" => { OpCode::Or8(AddressingMode::Register(Register::A), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "10111110" => { OpCode::Cp8(AddressingMode::Register(Register::A), AddressingMode::IndirectRegister(RegisterPairs::HL)) },
         [] "11010011" => { OpCode::Illegal },
         [] "11100011" => { OpCode::Illegal },
         [] "11100100" => { OpCode::Illegal },
         [] "11110100" => { OpCode::Illegal },
-
         [] "11011011" => { OpCode::Illegal },
         [] "11101011" => { OpCode::Illegal },
         [] "11101100" => { OpCode::Illegal },
@@ -277,28 +272,28 @@ generate_decoder_tables! {
         [] "11111101" => { OpCode::Illegal },
     },
     PREFIXED_TABLE: [OpCode; 256] {
-        [r: Register] "00000rrr" => { OpCode::RlcReg(#r) },
-        [r: Register] "00001rrr" => { OpCode::RrcReg(#r) },
-        [r: Register] "00010rrr" => { OpCode::RlReg(#r) },
-        [r: Register] "00011rrr" => { OpCode::RrReg(#r) },
-        [r: Register] "00100rrr" => { OpCode::SlaReg(#r) },
-        [r: Register] "00101rrr" => { OpCode::SraReg(#r) },
-        [r: Register] "00110rrr" => { OpCode::SwapReg(#r) },
-        [r: Register] "00111rrr" => { OpCode::SrlReg(#r) },
-        [] "00000110" => { OpCode::RlcHlInd },
-        [] "00001110" => { OpCode::RrcHlInd },
-        [] "00010110" => { OpCode::RlHlInd },
-        [] "00011110" => { OpCode::RrHlInd },
-        [] "00100110" => { OpCode::SlaHlInd },
-        [] "00101110" => { OpCode::SraHlInd },
-        [] "00110110" => { OpCode::SwapHlInd },
-        [] "00111110" => { OpCode::SrlHlInd },
-        [r: Register, b: Bit] "01bbbrrr" => { OpCode::Bit(#b, #r) },
-        [r: Register, b: Bit] "10bbbrrr" => { OpCode::Res(#b, #r) },
-        [r: Register, b: Bit] "11bbbrrr" => { OpCode::Set(#b, #r) },
-        [b: Bit] "01bbb110" => { OpCode::BitHlInd(#b) },
-        [b: Bit] "10bbb110" => { OpCode::ResHlInd(#b) },
-        [b: Bit] "11bbb110" => { OpCode::SetHlInd(#b) },
+        [r: Register] "00000rrr" => { OpCode::Rlc(AddressingMode::Register(#r)) },
+        [r: Register] "00001rrr" => { OpCode::Rrc(AddressingMode::Register(#r)) },
+        [r: Register] "00010rrr" => { OpCode::Rl(AddressingMode::Register(#r)) },
+        [r: Register] "00011rrr" => { OpCode::Rr(AddressingMode::Register(#r)) },
+        [r: Register] "00100rrr" => { OpCode::Sla(AddressingMode::Register(#r)) },
+        [r: Register] "00101rrr" => { OpCode::Sra(AddressingMode::Register(#r)) },
+        [r: Register] "00110rrr" => { OpCode::Swap(AddressingMode::Register(#r)) },
+        [r: Register] "00111rrr" => { OpCode::Srl(AddressingMode::Register(#r)) },
+        [] "00000110" => { OpCode::Rlc(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "00001110" => { OpCode::Rrc(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "00010110" => { OpCode::Rl(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "00011110" => { OpCode::Rr(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "00100110" => { OpCode::Sla(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "00101110" => { OpCode::Sra(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "00110110" => { OpCode::Swap(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [] "00111110" => { OpCode::Srl(AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [r: Register, b: Bit] "01bbbrrr" => { OpCode::Bit(#b, AddressingMode::Register(#r)) },
+        [r: Register, b: Bit] "10bbbrrr" => { OpCode::Res(#b, AddressingMode::Register(#r)) },
+        [r: Register, b: Bit] "11bbbrrr" => { OpCode::Set(#b, AddressingMode::Register(#r)) },
+        [b: Bit] "01bbb110" => { OpCode::Bit(#b, AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [b: Bit] "10bbb110" => { OpCode::Res(#b, AddressingMode::IndirectRegister(RegisterPairs::HL)) },
+        [b: Bit] "11bbb110" => { OpCode::Set(#b, AddressingMode::IndirectRegister(RegisterPairs::HL)) },
     },
 }
 

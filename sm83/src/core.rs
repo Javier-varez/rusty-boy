@@ -3,8 +3,8 @@
 
 use crate::{
     decoder::{
-        self, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairMem, RegisterPairStack,
-        ResetTarget,
+        self, AddressingMode, Bit, Condition, OpCode, Register, RegisterPair, RegisterPairStack,
+        RegisterPairs, ResetTarget,
     },
     interrupts::{Interrupt, Interrupts},
     memory::Memory,
@@ -504,6 +504,32 @@ impl Cpu {
         ((hi as u16) << 8) | (lo as u16)
     }
 
+    fn get_reg_pairs(&mut self, reg: RegisterPairs) -> u16 {
+        let regs = self.get_regs();
+        let (hi, lo) = match reg {
+            RegisterPairs::BC => (regs.b_reg, regs.c_reg),
+            RegisterPairs::DE => (regs.d_reg, regs.e_reg),
+            RegisterPairs::HL | RegisterPairs::HLINC | RegisterPairs::HLDEC => {
+                (regs.h_reg, regs.l_reg)
+            }
+            RegisterPairs::SP => {
+                return regs.sp_reg;
+            }
+        };
+        let value = ((hi as u16) << 8) | (lo as u16);
+
+        match reg {
+            RegisterPairs::HLINC => {
+                self.set_reg_pair(RegisterPair::HL, value.wrapping_add(1));
+            }
+            RegisterPairs::HLDEC => {
+                self.set_reg_pair(RegisterPair::HL, value.wrapping_sub(1));
+            }
+            _ => {}
+        }
+        value
+    }
+
     fn set_reg_pair(&mut self, reg: RegisterPair, value: u16) {
         let regs = self.get_mut_regs();
         let (hi, lo) = match reg {
@@ -511,6 +537,23 @@ impl Cpu {
             RegisterPair::DE => (&mut regs.d_reg, &mut regs.e_reg),
             RegisterPair::HL => (&mut regs.h_reg, &mut regs.l_reg),
             RegisterPair::SP => {
+                regs.sp_reg = value;
+                return;
+            }
+        };
+        *hi = ((value >> 8) & 0xff) as u8;
+        *lo = (value & 0xff) as u8;
+    }
+
+    fn set_reg_pairs(&mut self, reg: RegisterPairs, value: u16) {
+        let regs = self.get_mut_regs();
+        let (hi, lo) = match reg {
+            RegisterPairs::BC => (&mut regs.b_reg, &mut regs.c_reg),
+            RegisterPairs::DE => (&mut regs.d_reg, &mut regs.e_reg),
+            RegisterPairs::HL | RegisterPairs::HLINC | RegisterPairs::HLDEC => {
+                (&mut regs.h_reg, &mut regs.l_reg)
+            }
+            RegisterPairs::SP => {
                 regs.sp_reg = value;
                 return;
             }
@@ -545,27 +588,6 @@ impl Cpu {
         };
         *hi = ((value >> 8) & 0xff) as u8;
         *lo = (value & 0xff) as u8;
-    }
-
-    fn get_reg_pair_mem(&mut self, reg: RegisterPairMem) -> u16 {
-        let regs = self.get_regs();
-        let (hi, lo) = match reg {
-            RegisterPairMem::BC => (regs.b_reg, regs.c_reg),
-            RegisterPairMem::DE => (regs.d_reg, regs.e_reg),
-            RegisterPairMem::HLINC | RegisterPairMem::HLDEC => (regs.h_reg, regs.l_reg),
-        };
-        let value = ((hi as u16) << 8) | (lo as u16);
-
-        match reg {
-            RegisterPairMem::HLINC => {
-                self.set_reg_pair(RegisterPair::HL, value.wrapping_add(1));
-            }
-            RegisterPairMem::HLDEC => {
-                self.set_reg_pair(RegisterPair::HL, value.wrapping_sub(1));
-            }
-            _ => {}
-        }
-        value
     }
 
     fn step_pc(&mut self) -> u16 {
@@ -654,6 +676,102 @@ impl Cpu {
         }
     }
 
+    fn load_8bit_with_addressing_mode<T: Memory>(
+        &mut self,
+        memory: &mut T,
+        mode: AddressingMode,
+    ) -> (Cycles, u8) {
+        match mode {
+            AddressingMode::Register(r) => (Cycles::new(0), self.get_reg(r)),
+            AddressingMode::Immediate => (Cycles::new(4), self.read_8_bit_immediate(memory)),
+            AddressingMode::IndirectRegister(r) => {
+                let addr = self.get_reg_pairs(r);
+                (Cycles::new(4), memory.read(addr))
+            }
+            AddressingMode::IndirectZeroPageRegister(r) => {
+                let addr = self.get_reg(r) as u16 | 0xFF00;
+                (Cycles::new(4), memory.read(addr))
+            }
+            AddressingMode::IndirectZeroPageImmediate => {
+                let addr = self.read_8_bit_immediate(memory) as u16 | 0xFF00;
+                (Cycles::new(8), memory.read(addr))
+            }
+            AddressingMode::IndirectImmediate => {
+                let addr = self.read_16_bit_immediate(memory);
+                (Cycles::new(12), memory.read(addr))
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn store_8bit_with_addressing_mode<T: Memory>(
+        &mut self,
+        memory: &mut T,
+        mode: AddressingMode,
+        value: u8,
+    ) -> Cycles {
+        match mode {
+            AddressingMode::Register(r) => {
+                self.set_reg(r, value);
+                Cycles::new(0)
+            }
+            AddressingMode::IndirectRegister(r) => {
+                let addr = self.get_reg_pairs(r);
+                memory.write(addr, value);
+                Cycles::new(4)
+            }
+            AddressingMode::IndirectZeroPageRegister(r) => {
+                let addr = self.get_reg(r) as u16 | 0xFF00;
+                memory.write(addr, value);
+                Cycles::new(4)
+            }
+            AddressingMode::IndirectZeroPageImmediate => {
+                let addr = self.read_8_bit_immediate(memory) as u16 | 0xFF00;
+                memory.write(addr, value);
+                Cycles::new(8)
+            }
+            AddressingMode::IndirectImmediate => {
+                let addr = self.read_16_bit_immediate(memory);
+                memory.write(addr, value);
+                Cycles::new(12)
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn load_16bit_with_addressing_mode<T: Memory>(
+        &mut self,
+        memory: &mut T,
+        mode: AddressingMode,
+    ) -> (Cycles, u16) {
+        match mode {
+            AddressingMode::RegisterPair(r) => (Cycles::new(0), self.get_reg_pairs(r)),
+            AddressingMode::Immediate16 => (Cycles::new(8), self.read_16_bit_immediate(memory)),
+            _ => unreachable!(),
+        }
+    }
+
+    fn store_16bit_with_addressing_mode<T: Memory>(
+        &mut self,
+        memory: &mut T,
+        mode: AddressingMode,
+        value: u16,
+    ) -> Cycles {
+        match mode {
+            AddressingMode::RegisterPair(r) => {
+                self.set_reg_pairs(r, value);
+                Cycles::new(0)
+            }
+            AddressingMode::IndirectImmediate => {
+                let addr = self.read_16_bit_immediate(memory);
+                memory.write(addr, (value & 0xff) as u8);
+                memory.write(addr.wrapping_add(1), (value >> 8) as u8);
+                Cycles::new(16)
+            }
+            _ => unreachable!(),
+        }
+    }
+
     fn execute<T: Memory>(&mut self, memory: &mut T, opcode: OpCode) -> ExitReason {
         let cycles = match opcode {
             OpCode::Prefix => {
@@ -671,96 +789,20 @@ impl Cpu {
             }
             // All instructions below use ExitReason::Step
             OpCode::Nop => Cycles::new(4),
-            OpCode::Ld8RegReg(dest, src) => {
-                let value = self.get_reg(src);
-                self.set_reg(dest, value);
-                Cycles::new(4)
+            OpCode::Ld8(dest, src) => {
+                let (cycles, value) = self.load_8bit_with_addressing_mode(memory, src);
+                Cycles::new(4) + cycles + self.store_8bit_with_addressing_mode(memory, dest, value)
             }
-            OpCode::Ld8RegImm(dest) => {
-                let value = self.read_8_bit_immediate(memory);
-                self.set_reg(dest, value);
-                Cycles::new(8)
-            }
-            OpCode::Ld8RegInd(dest, src) => {
-                let addr = self.get_reg_pair(src);
-                let value = memory.read(addr);
-                self.set_reg(dest, value);
-                Cycles::new(8)
-            }
-            OpCode::Ld8IndReg(dest, src) => {
-                let value = self.get_reg(src);
-                let addr = self.get_reg_pair(dest);
-                memory.write(addr, value);
-                Cycles::new(8)
-            }
-            OpCode::Ld8IndImm(dest) => {
-                let value = self.read_8_bit_immediate(memory);
-                let addr = self.get_reg_pair(dest);
-                memory.write(addr, value);
-                Cycles::new(12)
-            }
-            OpCode::Ld8IndAcc(dest) => {
-                let value = self.get_reg(Register::A);
-                let addr = self.get_reg_pair_mem(dest);
-                memory.write(addr, value);
-                Cycles::new(8)
-            }
-            OpCode::Ld8AccInd(dest) => {
-                let addr = self.get_reg_pair_mem(dest);
-                let value = memory.read(addr);
-                self.set_reg(Register::A, value);
-                Cycles::new(8)
-            }
-            OpCode::Ld8ZeroPageCAcc => {
-                let regs = self.get_regs();
-                let addr = 0xFF00 | regs.c_reg as u16;
-                memory.write(addr, regs.a_reg);
-                Cycles::new(8)
-            }
-            OpCode::Ld8AccZeroPageC => {
-                let regs = self.get_regs();
-                let addr = 0xFF00 | regs.c_reg as u16;
-                let value = memory.read(addr);
-                self.get_mut_regs().a_reg = value;
-                Cycles::new(8)
-            }
-            OpCode::Ld8ZeroPageImmAcc => {
-                let imm = self.read_8_bit_immediate(memory);
-                let addr = 0xFF00 | imm as u16;
-                memory.write(addr, self.get_regs().a_reg);
-                Cycles::new(12)
-            }
-            OpCode::Ld8AccZeroPageImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let addr = 0xFF00 | imm as u16;
-                let value = memory.read(addr);
-                self.get_mut_regs().a_reg = value;
-                Cycles::new(12)
-            }
-            OpCode::Ld8IndImmAcc => {
-                let imm = self.read_16_bit_immediate(memory);
-                let addr = imm;
-                memory.write(addr, self.get_regs().a_reg);
-                Cycles::new(16)
-            }
-            OpCode::Ld8AccIndImm => {
-                let imm = self.read_16_bit_immediate(memory);
-                let addr = imm;
-                let value = memory.read(addr);
-                self.get_mut_regs().a_reg = value;
-                Cycles::new(16)
-            }
-            OpCode::Ld16RegImm(dest) => {
-                let imm = self.read_16_bit_immediate(memory);
-                self.set_reg_pair(dest, imm);
-                Cycles::new(12)
-            }
-            OpCode::Ld16IndImmSp => {
-                let imm = self.read_16_bit_immediate(memory);
-                let sp = self.get_reg_pair(RegisterPair::SP);
-                memory.write(imm, (sp & 0xff) as u8);
-                memory.write(imm.wrapping_add(1), (sp >> 8) as u8);
-                Cycles::new(20)
+            OpCode::Ld16(dest, src) => {
+                let (cycles, value) = self.load_16bit_with_addressing_mode(memory, src);
+                let cycles = Cycles::new(4)
+                    + cycles
+                    + self.store_16bit_with_addressing_mode(memory, dest, value);
+                if cycles < Cycles::new(8) {
+                    Cycles::new(8)
+                } else {
+                    cycles
+                }
             }
             OpCode::Ld16HlSpImm => {
                 let sp = self.get_regs().sp_reg;
@@ -777,144 +819,111 @@ impl Cpu {
                 );
                 Cycles::new(12)
             }
-            OpCode::Ld16SpHl => {
-                let value = self.get_reg_pair(RegisterPair::HL);
-                self.get_mut_regs().sp_reg = value;
-                Cycles::new(8)
-            }
-            OpCode::AddRegReg(dest, src) => {
-                let src_val = self.get_reg(src);
-                let dest_val = self.get_reg(dest);
+            OpCode::Add8(dest, src) => {
+                let (src_cycles, src_val) = self.load_8bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_8bit_with_addressing_mode(memory, dest);
+
                 let (result, flags) = add(src_val, dest_val, false);
-                self.set_reg(dest, result);
                 self.set_flags(flags);
+
                 Cycles::new(4)
+                    + src_cycles
+                    + dest_cycles
+                    + self.store_8bit_with_addressing_mode(memory, dest, result)
             }
-            OpCode::SubRegReg(dest, src) => {
-                let src_val = self.get_reg(src);
-                let dest_val = self.get_reg(dest);
+            OpCode::Sub8(dest, src) => {
+                let (src_cycles, src_val) = self.load_8bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_8bit_with_addressing_mode(memory, dest);
+
                 let (result, flags) = sub(dest_val, src_val, false);
-                self.set_reg(dest, result);
                 self.set_flags(flags);
+
                 Cycles::new(4)
+                    + src_cycles
+                    + dest_cycles
+                    + self.store_8bit_with_addressing_mode(memory, dest, result)
             }
-            OpCode::AndRegReg(dest, src) => {
-                let src_val = self.get_reg(src);
-                let dest_val = self.get_reg(dest);
+
+            OpCode::And8(dest, src) => {
+                let (src_cycles, src_val) = self.load_8bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_8bit_with_addressing_mode(memory, dest);
+
                 let (result, flags) = and(src_val, dest_val);
-                self.set_reg(dest, result);
                 self.set_flags(flags);
+
                 Cycles::new(4)
+                    + src_cycles
+                    + dest_cycles
+                    + self.store_8bit_with_addressing_mode(memory, dest, result)
             }
-            OpCode::OrRegReg(dest, src) => {
-                let src_val = self.get_reg(src);
-                let dest_val = self.get_reg(dest);
+            OpCode::Or8(dest, src) => {
+                let (src_cycles, src_val) = self.load_8bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_8bit_with_addressing_mode(memory, dest);
+
                 let (result, flags) = or(src_val, dest_val);
-                self.set_reg(dest, result);
                 self.set_flags(flags);
+
                 Cycles::new(4)
+                    + src_cycles
+                    + dest_cycles
+                    + self.store_8bit_with_addressing_mode(memory, dest, result)
             }
-            OpCode::AdcRegReg(dest, src) => {
-                let src_val = self.get_reg(src);
-                let dest_val = self.get_reg(dest);
+            OpCode::Adc8(dest, src) => {
+                let (src_cycles, src_val) = self.load_8bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_8bit_with_addressing_mode(memory, dest);
+
                 let (result, flags) = add(src_val, dest_val, self.get_flag(Flag::C));
-                self.set_reg(dest, result);
                 self.set_flags(flags);
+
                 Cycles::new(4)
+                    + src_cycles
+                    + dest_cycles
+                    + self.store_8bit_with_addressing_mode(memory, dest, result)
             }
-            OpCode::SbcRegReg(dest, src) => {
-                let src_val = self.get_reg(src);
-                let dest_val = self.get_reg(dest);
+            OpCode::Sbc8(dest, src) => {
+                let (src_cycles, src_val) = self.load_8bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_8bit_with_addressing_mode(memory, dest);
+
                 let (result, flags) = sub(dest_val, src_val, self.get_flag(Flag::C));
-                self.set_reg(dest, result);
                 self.set_flags(flags);
+
                 Cycles::new(4)
+                    + src_cycles
+                    + dest_cycles
+                    + self.store_8bit_with_addressing_mode(memory, dest, result)
             }
-            OpCode::XorRegReg(dest, src) => {
-                let src_val = self.get_reg(src);
-                let dest_val = self.get_reg(dest);
+            OpCode::Xor8(dest, src) => {
+                let (src_cycles, src_val) = self.load_8bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_8bit_with_addressing_mode(memory, dest);
+
                 let (result, flags) = xor(src_val, dest_val);
-                self.set_reg(dest, result);
                 self.set_flags(flags);
+
                 Cycles::new(4)
+                    + src_cycles
+                    + dest_cycles
+                    + self.store_8bit_with_addressing_mode(memory, dest, result)
             }
-            OpCode::CpRegReg(dest, src) => {
-                let src_val = self.get_reg(src);
-                let dest_val = self.get_reg(dest);
+            OpCode::Cp8(dest, src) => {
+                let (src_cycles, src_val) = self.load_8bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_8bit_with_addressing_mode(memory, dest);
+
                 let (_, flags) = sub(dest_val, src_val, false);
                 self.set_flags(flags);
-                Cycles::new(4)
+
+                Cycles::new(4) + src_cycles + dest_cycles
             }
-            OpCode::AddRegPairRegPair(dest, src) => {
-                let src_val = self.get_reg_pair(src);
-                let dest_val = self.get_reg_pair(dest);
+            OpCode::Add16(dest, src) => {
+                let (src_cycles, src_val) = self.load_16bit_with_addressing_mode(memory, src);
+                let (dest_cycles, dest_val) = self.load_16bit_with_addressing_mode(memory, dest);
+
                 let (result, flags) = add16(src_val, dest_val, self.get_flags());
-                self.set_reg_pair(dest, result);
                 self.set_flags(flags);
+
                 Cycles::new(8)
-            }
-            OpCode::AddAccImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = add(a, imm, false);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::AdcAccImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = add(a, imm, self.get_flag(Flag::C));
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::SubAccImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = sub(a, imm, false);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::SbcAccImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = sub(a, imm, self.get_flag(Flag::C));
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::AndAccImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = and(a, imm);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::OrAccImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = or(a, imm);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::XorAccImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = xor(a, imm);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::CpAccImm => {
-                let imm = self.read_8_bit_immediate(memory);
-                let a = self.get_reg(Register::A);
-                let (_, flags) = sub(a, imm, false);
-                self.set_flags(flags);
-                Cycles::new(8)
+                    + src_cycles
+                    + dest_cycles
+                    + self.store_16bit_with_addressing_mode(memory, dest, result)
             }
             OpCode::AddSpImm => {
                 // This is somewhat special as it is signed 16-bit addition
@@ -929,140 +938,50 @@ impl Cpu {
                 );
                 Cycles::new(16)
             }
-            OpCode::AddAccHlInd => {
-                let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = memory.read(hl);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = add(a, mem, false);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::AdcAccHlInd => {
-                let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = memory.read(hl);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = add(a, mem, self.get_flag(Flag::C));
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::SubAccHlInd => {
-                let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = memory.read(hl);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = sub(a, mem, false);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::SbcAccHlInd => {
-                let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = memory.read(hl);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = sub(a, mem, self.get_flag(Flag::C));
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::AndAccHlInd => {
-                let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = memory.read(hl);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = and(a, mem);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::XorAccHlInd => {
-                let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = memory.read(hl);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = xor(a, mem);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::OrAccHlInd => {
-                let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = memory.read(hl);
-                let a = self.get_reg(Register::A);
-                let (result, flags) = or(a, mem);
-                self.set_reg(Register::A, result);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::CpAccHlInd => {
-                let hl = self.get_reg_pair(RegisterPair::HL);
-                let mem = memory.read(hl);
-                let a = self.get_reg(Register::A);
-                let (_, flags) = sub(a, mem, false);
-                self.set_flags(flags);
-                Cycles::new(8)
-            }
-            OpCode::IncReg(reg) => {
-                let prev = self.get_reg(reg);
-                let next = self.get_reg(reg).wrapping_add(1);
-                self.set_reg(reg, next);
+            OpCode::Inc8(reg) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, reg);
+
+                let next = prev.wrapping_add(1);
                 self.set_flags(
                     self.get_flags()
                         .with(Flag::Z, next == 0)
                         .with(Flag::N, false)
                         .with(Flag::H, carry_bit8(prev, 1, next, 4)),
                 );
+
                 Cycles::new(4)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, reg, next)
             }
-            OpCode::DecReg(reg) => {
-                let minus_one = 0xff;
-                let prev = self.get_reg(reg);
-                let next = prev.wrapping_add(minus_one);
-                self.set_reg(reg, next);
+            OpCode::Dec8(reg) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, reg);
+
+                const MINUS_ONE: u8 = 0xff;
+                let next = prev.wrapping_add(MINUS_ONE);
                 self.set_flags(
                     self.get_flags()
                         .with(Flag::Z, next == 0u8)
                         .with(Flag::N, true)
-                        .with(Flag::H, !carry_bit8(minus_one, prev, next, 4)),
+                        .with(Flag::H, !carry_bit8(MINUS_ONE, prev, next, 4)),
                 );
+
                 Cycles::new(4)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, reg, next)
             }
-            OpCode::IncRegPair(reg) => {
-                let prev = self.get_reg_pair(reg);
+            OpCode::Inc16(reg) => {
+                let (load_cycles, prev) = self.load_16bit_with_addressing_mode(memory, reg);
                 let next = prev.wrapping_add(1);
-                self.set_reg_pair(reg, next);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_16bit_with_addressing_mode(memory, reg, next)
             }
-            OpCode::DecRegPair(reg) => {
-                let prev = self.get_reg_pair(reg);
+            OpCode::Dec16(reg) => {
+                let (load_cycles, prev) = self.load_16bit_with_addressing_mode(memory, reg);
                 let next = prev.wrapping_sub(1);
-                self.set_reg_pair(reg, next);
                 Cycles::new(8)
-            }
-            OpCode::IncIndHl => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let prev = memory.read(addr);
-                let next = prev.wrapping_add(1);
-                memory.write(addr, next);
-                self.set_flags(
-                    self.get_flags()
-                        .with(Flag::Z, next == 0)
-                        .with(Flag::N, false)
-                        .with(Flag::H, carry_bit8(prev, 1, next, 4)),
-                );
-                Cycles::new(12)
-            }
-            OpCode::DecIndHl => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let minus_one = 0xff;
-                let prev = memory.read(addr);
-                let next = prev.wrapping_add(minus_one);
-                memory.write(addr, next);
-                self.set_flags(
-                    self.get_flags()
-                        .with(Flag::Z, next == 0u8)
-                        .with(Flag::N, true)
-                        .with(Flag::H, !carry_bit8(minus_one, prev, next, 4)),
-                );
-                Cycles::new(12)
+                    + load_cycles
+                    + self.store_16bit_with_addressing_mode(memory, reg, next)
             }
             OpCode::Daa => {
                 let a = self.get_reg(Register::A);
@@ -1097,14 +1016,14 @@ impl Cpu {
                 );
                 Cycles::new(4)
             }
-            OpCode::JrImm => {
+            OpCode::JrImm(None) => {
                 let target_offset = self.read_8_bit_immediate(memory) as i8 as i16;
                 let pc = self.get_regs().pc_reg;
                 let target = (pc as i16).wrapping_add(target_offset) as u16;
                 self.get_mut_regs().pc_reg = target;
                 Cycles::new(12)
             }
-            OpCode::JrCondImm(condition) => {
+            OpCode::JrImm(Some(condition)) => {
                 let target_offset = self.read_8_bit_immediate(memory) as i8 as i16;
                 if self.check_condition(condition) {
                     let pc = self.get_regs().pc_reg;
@@ -1115,7 +1034,12 @@ impl Cpu {
                     Cycles::new(8)
                 }
             }
-            OpCode::RetCond(condition) => {
+            OpCode::Ret(None) => {
+                let value = self.stack_pop(memory);
+                self.get_mut_regs().pc_reg = value;
+                Cycles::new(16)
+            }
+            OpCode::Ret(Some(condition)) => {
                 if self.check_condition(condition) {
                     let value = self.stack_pop(memory);
                     self.get_mut_regs().pc_reg = value;
@@ -1124,11 +1048,6 @@ impl Cpu {
                     Cycles::new(8)
                 }
             }
-            OpCode::Ret => {
-                let value = self.stack_pop(memory);
-                self.get_mut_regs().pc_reg = value;
-                Cycles::new(16)
-            }
             OpCode::Reti => {
                 let value = self.stack_pop(memory);
                 let regs = self.get_mut_regs();
@@ -1136,7 +1055,7 @@ impl Cpu {
                 regs.irq_en = true;
                 Cycles::new(16)
             }
-            OpCode::JpCondImm(condition) => {
+            OpCode::JpImm(Some(condition)) => {
                 let target = self.read_16_bit_immediate(memory);
                 if self.check_condition(condition) {
                     self.get_mut_regs().pc_reg = target;
@@ -1145,7 +1064,7 @@ impl Cpu {
                     Cycles::new(12)
                 }
             }
-            OpCode::JpImm => {
+            OpCode::JpImm(None) => {
                 let target = self.read_16_bit_immediate(memory);
                 self.get_mut_regs().pc_reg = target;
                 Cycles::new(16)
@@ -1155,7 +1074,7 @@ impl Cpu {
                 self.get_mut_regs().pc_reg = target;
                 Cycles::new(4)
             }
-            OpCode::CallCondImm(condition) => {
+            OpCode::CallImm(Some(condition)) => {
                 let target = self.read_16_bit_immediate(memory);
                 if self.check_condition(condition) {
                     let return_addr = self.get_regs().pc_reg;
@@ -1166,7 +1085,7 @@ impl Cpu {
                     Cycles::new(12)
                 }
             }
-            OpCode::CallImm => {
+            OpCode::CallImm(None) => {
                 let target = self.read_16_bit_immediate(memory);
                 let return_addr = self.get_regs().pc_reg;
                 self.stack_push(memory, return_addr);
@@ -1223,142 +1142,90 @@ impl Cpu {
                 self.set_flags(flags);
                 Cycles::new(4)
             }
-            OpCode::RlcReg(register) => {
-                let (shifted, flags) = rlc(self.get_reg(register), true);
-                self.set_reg(register, shifted);
+            OpCode::Rlc(mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let (shifted, flags) = rlc(prev, true);
                 self.set_flags(flags);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, shifted)
             }
-            OpCode::RrcReg(register) => {
-                let (shifted, flags) = rrc(self.get_reg(register), true);
-                self.set_reg(register, shifted);
+            OpCode::Rrc(mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let (shifted, flags) = rrc(prev, true);
                 self.set_flags(flags);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, shifted)
             }
-            OpCode::RlReg(register) => {
-                let (shifted, flags) = rl(self.get_reg(register), self.get_flag(Flag::C), true);
-                self.set_reg(register, shifted);
+            OpCode::Rl(mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let (shifted, flags) = rl(prev, self.get_flag(Flag::C), true);
                 self.set_flags(flags);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, shifted)
             }
-            OpCode::RrReg(register) => {
-                let (shifted, flags) = rr(self.get_reg(register), self.get_flag(Flag::C), true);
-                self.set_reg(register, shifted);
+            OpCode::Rr(mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let (shifted, flags) = rr(prev, self.get_flag(Flag::C), true);
                 self.set_flags(flags);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, shifted)
             }
-            OpCode::SlaReg(register) => {
-                let (shifted, flags) = sla(self.get_reg(register));
-                self.set_reg(register, shifted);
+            OpCode::Sla(mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let (shifted, flags) = sla(prev);
                 self.set_flags(flags);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, shifted)
             }
-            OpCode::SraReg(register) => {
-                let (shifted, flags) = sra(self.get_reg(register));
-                self.set_reg(register, shifted);
+            OpCode::Sra(mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let (shifted, flags) = sra(prev);
                 self.set_flags(flags);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, shifted)
             }
-            OpCode::SwapReg(register) => {
-                let (shifted, flags) = swap(self.get_reg(register));
-                self.set_reg(register, shifted);
+            OpCode::Swap(mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let (shifted, flags) = swap(prev);
                 self.set_flags(flags);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, shifted)
             }
-            OpCode::SrlReg(register) => {
-                let (shifted, flags) = srl(self.get_reg(register));
-                self.set_reg(register, shifted);
+            OpCode::Srl(mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let (shifted, flags) = srl(prev);
                 self.set_flags(flags);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, shifted)
             }
-            OpCode::Bit(bit_idx, register) => {
-                let flags = bit(bit_idx, self.get_reg(register), self.get_flags());
+            OpCode::Bit(bit_idx, mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let flags = bit(bit_idx, prev, self.get_flags());
                 self.set_flags(flags);
+
+                Cycles::new(8) + load_cycles
+            }
+            OpCode::Res(bit_idx, mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let value = res(bit_idx, prev);
                 Cycles::new(8)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, value)
             }
-            OpCode::Res(bit_idx, register) => {
-                let value = res(bit_idx, self.get_reg(register));
-                self.set_reg(register, value);
+            OpCode::Set(bit_idx, mode) => {
+                let (load_cycles, prev) = self.load_8bit_with_addressing_mode(memory, mode);
+                let value = set(bit_idx, prev);
                 Cycles::new(8)
-            }
-            OpCode::Set(bit_idx, register) => {
-                let value = set(bit_idx, self.get_reg(register));
-                self.set_reg(register, value);
-                Cycles::new(8)
-            }
-            OpCode::RlcHlInd => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rlc(memory.read(addr), true);
-                memory.write(addr, shifted);
-                self.set_flags(flags);
-                Cycles::new(16)
-            }
-            OpCode::RrcHlInd => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rrc(memory.read(addr), true);
-                memory.write(addr, shifted);
-                self.set_flags(flags);
-                Cycles::new(16)
-            }
-            OpCode::RlHlInd => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rl(memory.read(addr), self.get_flag(Flag::C), true);
-                memory.write(addr, shifted);
-                self.set_flags(flags);
-                Cycles::new(16)
-            }
-            OpCode::RrHlInd => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = rr(memory.read(addr), self.get_flag(Flag::C), true);
-                memory.write(addr, shifted);
-                self.set_flags(flags);
-                Cycles::new(16)
-            }
-            OpCode::SlaHlInd => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = sla(memory.read(addr));
-                memory.write(addr, shifted);
-                self.set_flags(flags);
-                Cycles::new(16)
-            }
-            OpCode::SraHlInd => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = sra(memory.read(addr));
-                memory.write(addr, shifted);
-                self.set_flags(flags);
-                Cycles::new(16)
-            }
-            OpCode::SwapHlInd => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = swap(memory.read(addr));
-                memory.write(addr, shifted);
-                self.set_flags(flags);
-                Cycles::new(16)
-            }
-            OpCode::SrlHlInd => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let (shifted, flags) = srl(memory.read(addr));
-                memory.write(addr, shifted);
-                self.set_flags(flags);
-                Cycles::new(16)
-            }
-            OpCode::BitHlInd(bit_idx) => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let flags = bit(bit_idx, memory.read(addr), self.get_flags());
-                self.set_flags(flags);
-                Cycles::new(12)
-            }
-            OpCode::ResHlInd(bit_idx) => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let value = res(bit_idx, memory.read(addr));
-                memory.write(addr, value);
-                Cycles::new(16)
-            }
-            OpCode::SetHlInd(bit_idx) => {
-                let addr = self.get_reg_pair(RegisterPair::HL);
-                let value = set(bit_idx, memory.read(addr));
-                memory.write(addr, value);
-                Cycles::new(16)
+                    + load_cycles
+                    + self.store_8bit_with_addressing_mode(memory, mode, value)
             }
         };
         ExitReason::Step(cycles)
