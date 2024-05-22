@@ -131,11 +131,13 @@ impl Oam {
         &*self.objects
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn read(&self, address: sm83::memory::Address) -> u8 {
         let (object_idx, object_member_offset) = Self::cpu_addr_to_object_addr(address);
         self.objects[object_idx].read(object_member_offset)
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         let (object_idx, object_member_offset) = Self::cpu_addr_to_object_addr(address);
         self.objects[object_idx].write(object_member_offset, value);

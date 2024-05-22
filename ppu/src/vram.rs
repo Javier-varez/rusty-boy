@@ -211,6 +211,7 @@ impl TileMap {
         })
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn line(&self, line: usize) -> &[TileIndex; TILE_MAP_WIDTH] {
         let line = (line / TILE_HEIGHT) % TILE_MAP_HEIGHT;
         &self.0[line]
@@ -288,6 +289,7 @@ impl Vram {
         (tile_map_idx, tile_map_address)
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub(crate) fn get_bg_tile_map(&self, map: crate::regs::LCDC::BG_TILE_MAP::Value) -> &TileMap {
         match map {
             crate::regs::LCDC::BG_TILE_MAP::Value::HighMap => &self.0.tile_maps[1],
@@ -295,6 +297,7 @@ impl Vram {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub(crate) fn get_win_tile_map(
         &self,
         map: crate::regs::LCDC::WINDOW_TILE_MAP::Value,
@@ -305,6 +308,7 @@ impl Vram {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub(crate) fn get_tile(
         &self,
         index: TileIndex,
@@ -319,6 +323,7 @@ impl Vram {
         self.0.tile_blocks[block].get_tile(index)
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn read(&self, address: sm83::memory::Address) -> u8 {
         if address < 0x9800 {
             let (blk_idx, blk_address) = Self::vram_address_to_block_address(address);
@@ -329,6 +334,7 @@ impl Vram {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         if address < 0x9800 {
             let (blk_idx, blk_address) = Self::vram_address_to_block_address(address);

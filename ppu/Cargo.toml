@@ -11,6 +11,9 @@ categories = ["embedded", "gaming"]
 keywords = ["embedded", "gameboy", "playdate"]
 readme = "../README.md"
 
+[features]
+profile = []
+
 [dependencies]
 sm83 = { path =  "../sm83", version = "0.1.0" }
 tock-registers = "0.9.0"

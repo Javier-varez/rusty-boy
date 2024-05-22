@@ -134,6 +134,7 @@ const fn carry_bit32(a: u32, b: u32, c: u32, bit: usize) -> bool {
     (xor & (1 << bit)) != 0
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 fn add(a: u8, b: u8, carry: bool) -> (u8, Flags) {
     let a = a as u16;
     let b = b as u16;
@@ -149,6 +150,7 @@ fn add(a: u8, b: u8, carry: bool) -> (u8, Flags) {
     (result as u8, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn add16(a: u16, b: u16, flags: Flags) -> (u16, Flags) {
     let a = a as u32;
     let b = b as u32;
@@ -162,6 +164,7 @@ const fn add16(a: u16, b: u16, flags: Flags) -> (u16, Flags) {
     (result as u16, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn sub(a: u8, b: u8, carry: bool) -> (u8, Flags) {
     let a = a as u16;
     let b = b as u16;
@@ -178,6 +181,7 @@ const fn sub(a: u8, b: u8, carry: bool) -> (u8, Flags) {
     (result as u8, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn and(a: u8, b: u8) -> (u8, Flags) {
     let result = a & b;
 
@@ -186,18 +190,21 @@ const fn and(a: u8, b: u8) -> (u8, Flags) {
     (result, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn or(a: u8, b: u8) -> (u8, Flags) {
     let result = a | b;
     let flags = Flags::new().with(Flag::Z, result == 0);
     (result, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn xor(a: u8, b: u8) -> (u8, Flags) {
     let result = a ^ b;
     let flags = Flags::new().with(Flag::Z, result == 0);
     (result, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn daa(a: u8, flags: Flags) -> (u8, Flags) {
     let mut result = a;
     let mut carry = false;
@@ -233,6 +240,7 @@ const fn daa(a: u8, flags: Flags) -> (u8, Flags) {
 
 // Some variants of this instruction (rlca) always set Z to 0, but others actually compute the
 // result
+#[cfg_attr(feature = "profile", inline(never))]
 const fn rlc(value: u8, real_z: bool) -> (u8, Flags) {
     let carry = (value & 0x80) != 0;
     let mut shifted = value << 1;
@@ -247,6 +255,7 @@ const fn rlc(value: u8, real_z: bool) -> (u8, Flags) {
 
 // Some variants of this instruction (rrca) always set Z to 0, but others actually compute the
 // result
+#[cfg_attr(feature = "profile", inline(never))]
 const fn rrc(value: u8, real_z: bool) -> (u8, Flags) {
     let carry = (value & 0x01) != 0;
     let mut shifted = value >> 1;
@@ -259,6 +268,7 @@ const fn rrc(value: u8, real_z: bool) -> (u8, Flags) {
     (shifted, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn rl(value: u8, old_carry: bool, real_z: bool) -> (u8, Flags) {
     let mut shifted = value << 1;
     if old_carry {
@@ -271,6 +281,7 @@ const fn rl(value: u8, old_carry: bool, real_z: bool) -> (u8, Flags) {
     (shifted, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn rr(value: u8, old_carry: bool, real_z: bool) -> (u8, Flags) {
     let mut shifted = value >> 1;
     if old_carry {
@@ -283,6 +294,7 @@ const fn rr(value: u8, old_carry: bool, real_z: bool) -> (u8, Flags) {
     (shifted, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn sla(value: u8) -> (u8, Flags) {
     let shifted = value << 1;
     let new_carry = (value & 0x80) != 0;
@@ -292,6 +304,7 @@ const fn sla(value: u8) -> (u8, Flags) {
     (shifted, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn sra(value: u8) -> (u8, Flags) {
     let negative = (value & 0x80) != 0;
     let new_carry = (value & 0x01) != 0;
@@ -302,12 +315,14 @@ const fn sra(value: u8) -> (u8, Flags) {
     (shifted, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn swap(value: u8) -> (u8, Flags) {
     let swapped = (value >> 4) | (value << 4);
     let flags = Flags::new().with(Flag::Z, swapped == 0);
     (swapped, flags)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn srl(value: u8) -> (u8, Flags) {
     let new_carry = (value & 0x01) != 0;
     let shifted = value >> 1;
@@ -321,6 +336,7 @@ const fn bit_mask(bit: Bit) -> u8 {
     1 << (bit as u8)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn bit(bit_idx: Bit, value: u8, flags: Flags) -> Flags {
     let bit = bit_mask(bit_idx);
     let z_flag = (bit & value) == 0;
@@ -330,10 +346,12 @@ const fn bit(bit_idx: Bit, value: u8, flags: Flags) -> Flags {
         .with(Flag::Z, z_flag)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn res(bit_idx: Bit, value: u8) -> u8 {
     value & !bit_mask(bit_idx)
 }
 
+#[cfg_attr(feature = "profile", inline(never))]
 const fn set(bit_idx: Bit, value: u8) -> u8 {
     value | bit_mask(bit_idx)
 }
@@ -538,6 +556,7 @@ impl Cpu {
         *lo = (value & 0xff) as u8;
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn step_pc(&mut self) -> u16 {
         let regs = self.get_mut_regs();
         let pc = regs.pc_reg;
@@ -545,11 +564,13 @@ impl Cpu {
         pc
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn read_8_bit_immediate<T: Memory>(&mut self, memory: &mut T) -> u8 {
         let pc = self.step_pc();
         memory.read(pc)
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn read_16_bit_immediate<T: Memory>(&mut self, memory: &mut T) -> u16 {
         let pc = self.step_pc();
         let lo = memory.read(pc);
@@ -567,6 +588,7 @@ impl Cpu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn stack_push<T: Memory>(&mut self, memory: &mut T, value: u16) {
         let sp = self.get_reg_pair(RegisterPair::SP);
         let pos = sp.wrapping_sub(1);
@@ -576,6 +598,7 @@ impl Cpu {
         self.set_reg_pair(RegisterPair::SP, pos);
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn stack_pop<T: Memory>(&mut self, memory: &mut T) -> u16 {
         let sp = self.get_reg_pair(RegisterPair::SP);
         let pos = sp;
@@ -587,6 +610,7 @@ impl Cpu {
         (lo as u16) | ((hi as u16) << 8)
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn fetch_and_decode<T: Memory>(&mut self, memory: &mut T) -> OpCode {
         let pc = self.step_pc();
         let insn = memory.read(pc);
@@ -602,6 +626,7 @@ impl Cpu {
     }
 
     /// Executes a single CPU instruction and returns from the function.
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn step<T: Memory>(&mut self, memory: &mut T, interrupts: Interrupts) -> ExitReason {
         if self.halted && !interrupts.has_any() {
             return ExitReason::Halt(Cycles::new(4));
@@ -624,6 +649,7 @@ impl Cpu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn load_8bit_with_addressing_mode<T: Memory>(
         &mut self,
         memory: &mut T,
@@ -652,6 +678,7 @@ impl Cpu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn store_8bit_with_addressing_mode<T: Memory>(
         &mut self,
         memory: &mut T,
@@ -687,6 +714,7 @@ impl Cpu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn load_16bit_with_addressing_mode<T: Memory>(
         &mut self,
         memory: &mut T,
@@ -699,6 +727,7 @@ impl Cpu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn store_16bit_with_addressing_mode<T: Memory>(
         &mut self,
         memory: &mut T,
@@ -720,6 +749,7 @@ impl Cpu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn execute<T: Memory>(&mut self, memory: &mut T, opcode: OpCode) -> ExitReason {
         let cycles = match opcode {
             OpCode::Prefix => {

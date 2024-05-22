@@ -112,6 +112,7 @@ const OBJ_OFFSET_X: usize = 8;
 
 static_assertions::const_assert_eq!(70224, LINE_LENGTH * NUM_LINES);
 
+#[cfg_attr(feature = "profile", inline(never))]
 fn mode_for_current_cycle_count(line_cycles: Cycles, line: usize) -> Mode {
     // This is a simplified implementation that considers a fixed time mode 3.
     let line_cycles: usize = line_cycles.into();
@@ -159,7 +160,8 @@ impl Ppu {
         self.mode
     }
 
-    pub fn update_line_and_cycles(&mut self, cycles: Cycles) {
+    #[cfg_attr(feature = "profile", inline(never))]
+    fn update_line_and_cycles(&mut self, cycles: Cycles) {
         self.cycles = self.cycles + cycles;
         if self.cycles >= Cycles::new(LINE_LENGTH) {
             self.cycles = self.cycles - Cycles::new(LINE_LENGTH);
@@ -171,6 +173,7 @@ impl Ppu {
     }
 
     /// Runs the PPU for the given number of cycles and then returns the PPU state
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn step(
         &mut self,
         cycles: Cycles,
@@ -193,6 +196,7 @@ impl Ppu {
         &self.framebuffer
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn update_lcd_irq(&mut self) -> Interrupts {
         let lyc_eq_ly = self.regs.status.read(STAT::LYC_INT_SELECT) != 0
             && self.regs.status.read(STAT::LYC_EQ_LY) != 0;
@@ -217,6 +221,7 @@ impl Ppu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn oam_scan(&mut self) {
         self.selected_oam_entries = heapless::Vec::new();
 
@@ -238,6 +243,7 @@ impl Ppu {
             .collect();
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn step_inner(&mut self, new_mode: Mode, render: bool) -> (Interrupts, PpuResult) {
         const NO_IRQ: Interrupts = Interrupts::new();
         if self.mode == new_mode {
@@ -265,6 +271,7 @@ impl Ppu {
         (NO_IRQ, PpuResult::InProgress(self.mode))
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn draw_line_background(&self, line: &mut [PaletteIndex; DISPLAY_WIDTH]) -> Palette {
         let bg_win_enable = self.regs.lcdc.read(regs::LCDC::BG_AND_WINDOW_ENABLE) != 0;
         if !bg_win_enable {
@@ -319,6 +326,7 @@ impl Ppu {
         self.regs.bg_palette
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn draw_line_window(&self, line: &mut [PaletteIndex; DISPLAY_WIDTH]) {
         let bg_win_enable = self.regs.lcdc.read(regs::LCDC::BG_AND_WINDOW_ENABLE) != 0;
         if !bg_win_enable {
@@ -374,6 +382,7 @@ impl Ppu {
             .for_each(|(dest, palette_index)| *dest = palette_index);
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn draw_line_objects(
         &self,
         bg_line: &[PaletteIndex; DISPLAY_WIDTH],
@@ -445,6 +454,7 @@ impl Ppu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn draw_line(&mut self) {
         if self.regs.lcdc.read(regs::LCDC::ENABLE) == 0 {
             return;
@@ -478,6 +488,7 @@ impl Ppu {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     fn update_registers(&mut self) {
         let line = self.line as u8;
         self.regs.ly = line;
