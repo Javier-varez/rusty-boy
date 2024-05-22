@@ -159,6 +159,7 @@ impl Registers {
             .set((self.status.get() & RO_BITS) | (new_val & !RO_BITS));
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn read(&self, address: sm83::memory::Address) -> u8 {
         match address {
             0xFF40 => self.lcdc.get(),
@@ -179,6 +180,7 @@ impl Registers {
         }
     }
 
+    #[cfg_attr(feature = "profile", inline(never))]
     pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         match address {
             0xFF40 => self.lcdc.set(value),

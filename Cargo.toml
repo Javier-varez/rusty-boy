@@ -13,3 +13,6 @@ members = [
 exclude = [
     "rusty-date",
 ]
+
+[profile.release]
+debug = true

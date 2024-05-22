@@ -325,11 +325,13 @@ mod generated {
 
 /// Decodes a single instruction. May return an OpCode::Prefix value, which indicates that this
 /// instruction is prefixed, and `decode_prefixed` must be invoked with the next byte in the stream
+#[cfg_attr(feature = "profile", inline(never))]
 pub fn decode(byte: u8) -> OpCode {
     generated::DECODER_TABLE[byte as usize]
 }
 
 /// Decodes a prefixed instruction by looking at the byte after the 0xCB prefix byte.
+#[cfg_attr(feature = "profile", inline(never))]
 pub fn decode_prefixed(byte: u8) -> OpCode {
     generated::PREFIXED_TABLE[byte as usize]
 }

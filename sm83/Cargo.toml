@@ -11,6 +11,9 @@ categories = ["embedded", "gaming"]
 keywords = ["embedded", "gameboy", "playdate"]
 readme = "../README.md"
 
+[features]
+profile = []
+
 [dependencies]
 sm83_decoder_macros = { path = "../sm83_decoder_macros" }
 
