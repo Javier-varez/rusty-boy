@@ -385,6 +385,7 @@ const fn translate_irq_target(interrupt: Interrupt) -> u16 {
 
 /// Clock cycles, not machine cycles
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
 pub struct Cycles(usize);
 
 impl Cycles {
@@ -468,65 +469,66 @@ impl Cpu {
     }
 
     const fn get_flag(&self, flag: Flag) -> bool {
-        self.get_regs().flags.is_flag_set(flag)
+        self.regs.flags.is_flag_set(flag)
     }
 
     const fn get_flags(&self) -> Flags {
-        self.get_regs().flags
+        self.regs.flags
     }
 
     fn set_flags(&mut self, flags: Flags) {
-        self.get_mut_regs().flags = flags;
+        self.regs.flags = flags;
     }
 
     const fn get_reg(&self, reg: Register) -> u8 {
-        let regs = self.get_regs();
         match reg {
-            Register::A => regs.a_reg,
-            Register::B => regs.b_reg,
-            Register::C => regs.c_reg,
-            Register::D => regs.d_reg,
-            Register::E => regs.e_reg,
-            Register::H => regs.h_reg,
-            Register::L => regs.l_reg,
+            Register::A => self.regs.a_reg,
+            Register::B => self.regs.b_reg,
+            Register::C => self.regs.c_reg,
+            Register::D => self.regs.d_reg,
+            Register::E => self.regs.e_reg,
+            Register::H => self.regs.h_reg,
+            Register::L => self.regs.l_reg,
         }
     }
 
     fn set_reg(&mut self, reg: Register, value: u8) {
-        let regs = self.get_mut_regs();
         let target = match reg {
-            Register::A => &mut regs.a_reg,
-            Register::B => &mut regs.b_reg,
-            Register::C => &mut regs.c_reg,
-            Register::D => &mut regs.d_reg,
-            Register::E => &mut regs.e_reg,
-            Register::H => &mut regs.h_reg,
-            Register::L => &mut regs.l_reg,
+            Register::A => &mut self.regs.a_reg,
+            Register::B => &mut self.regs.b_reg,
+            Register::C => &mut self.regs.c_reg,
+            Register::D => &mut self.regs.d_reg,
+            Register::E => &mut self.regs.e_reg,
+            Register::H => &mut self.regs.h_reg,
+            Register::L => &mut self.regs.l_reg,
         };
         *target = value;
     }
 
     fn get_reg_pair(&mut self, reg: RegisterPair) -> u16 {
-        let regs = self.get_regs();
         let (hi, lo) = match reg {
-            RegisterPair::BC => (regs.b_reg, regs.c_reg),
-            RegisterPair::DE => (regs.d_reg, regs.e_reg),
+            RegisterPair::BC => (self.regs.b_reg, self.regs.c_reg),
+            RegisterPair::DE => (self.regs.d_reg, self.regs.e_reg),
             RegisterPair::HL | RegisterPair::HLINC | RegisterPair::HLDEC => {
-                (regs.h_reg, regs.l_reg)
+                (self.regs.h_reg, self.regs.l_reg)
             }
             RegisterPair::SP => {
-                return regs.sp_reg;
+                return self.regs.sp_reg;
             }
-            RegisterPair::AF => (regs.a_reg, regs.flags.0),
+            RegisterPair::AF => (self.regs.a_reg, self.regs.flags.0),
         };
         let value = ((hi as u16) << 8) | (lo as u16);
 
         match reg {
             RegisterPair::HLINC => {
-                self.set_reg_pair(RegisterPair::HL, value.wrapping_add(1));
+                let value = value.wrapping_add(1);
+                self.regs.h_reg = (value >> 8) as u8;
+                self.regs.l_reg = (value & 0xFF) as u8;
             }
             RegisterPair::HLDEC => {
-                self.set_reg_pair(RegisterPair::HL, value.wrapping_sub(1));
+                let value = value.wrapping_sub(1);
+                self.regs.h_reg = (value >> 8) as u8;
+                self.regs.l_reg = (value & 0xFF) as u8;
             }
             _ => {}
         }
@@ -534,19 +536,18 @@ impl Cpu {
     }
 
     fn set_reg_pair(&mut self, reg: RegisterPair, value: u16) {
-        let regs = self.get_mut_regs();
         let (hi, lo) = match reg {
-            RegisterPair::BC => (&mut regs.b_reg, &mut regs.c_reg),
-            RegisterPair::DE => (&mut regs.d_reg, &mut regs.e_reg),
+            RegisterPair::BC => (&mut self.regs.b_reg, &mut self.regs.c_reg),
+            RegisterPair::DE => (&mut self.regs.d_reg, &mut self.regs.e_reg),
             RegisterPair::HL | RegisterPair::HLINC | RegisterPair::HLDEC => {
-                (&mut regs.h_reg, &mut regs.l_reg)
+                (&mut self.regs.h_reg, &mut self.regs.l_reg)
             }
             RegisterPair::SP => {
-                regs.sp_reg = value;
+                self.regs.sp_reg = value;
                 return;
             }
             RegisterPair::AF => {
-                let (hi, lo) = (&mut regs.a_reg, &mut regs.flags);
+                let (hi, lo) = (&mut self.regs.a_reg, &mut self.regs.flags);
                 *hi = ((value >> 8) & 0xff) as u8;
                 *lo = ((value & 0xf0) as u8).into(); // lo-bits are hardcoded to 0
                 return;
@@ -558,9 +559,8 @@ impl Cpu {
 
     #[cfg_attr(feature = "profile", inline(never))]
     fn step_pc(&mut self) -> u16 {
-        let regs = self.get_mut_regs();
-        let pc = regs.pc_reg;
-        regs.pc_reg = regs.pc_reg.wrapping_add(1);
+        let pc = self.regs.pc_reg;
+        self.regs.pc_reg = self.regs.pc_reg.wrapping_add(1);
         pc
     }
 
@@ -590,23 +590,23 @@ impl Cpu {
 
     #[cfg_attr(feature = "profile", inline(never))]
     fn stack_push<T: Memory>(&mut self, memory: &mut T, value: u16) {
-        let sp = self.get_reg_pair(RegisterPair::SP);
+        let sp = self.regs.sp_reg;
         let pos = sp.wrapping_sub(1);
         memory.write(pos, (value >> 8) as u8);
         let pos = pos.wrapping_sub(1);
         memory.write(pos, (value & 0xff) as u8);
-        self.set_reg_pair(RegisterPair::SP, pos);
+        self.regs.sp_reg = pos;
     }
 
     #[cfg_attr(feature = "profile", inline(never))]
     fn stack_pop<T: Memory>(&mut self, memory: &mut T) -> u16 {
-        let sp = self.get_reg_pair(RegisterPair::SP);
+        let sp = self.regs.sp_reg;
         let pos = sp;
         let lo = memory.read(pos);
         let pos = pos.wrapping_add(1);
         let hi = memory.read(pos);
         let pos = pos.wrapping_add(1);
-        self.set_reg_pair(RegisterPair::SP, pos);
+        self.regs.sp_reg = pos;
         (lo as u16) | ((hi as u16) << 8)
     }
 
@@ -639,9 +639,9 @@ impl Cpu {
                 .and_then(|irq| if self.regs.irq_en { Some(irq) } else { None })
         {
             self.regs.irq_en = false;
-            let return_addr = self.get_regs().pc_reg;
+            let return_addr = self.regs.pc_reg;
             self.stack_push(memory, return_addr);
-            self.get_mut_regs().pc_reg = translate_irq_target(irq);
+            self.regs.pc_reg = translate_irq_target(irq);
             ExitReason::InterruptTaken(Cycles::new(20), irq)
         } else {
             let instruction = self.fetch_and_decode(memory);
@@ -783,7 +783,7 @@ impl Cpu {
                 }
             }
             OpCode::Ld16HlSpImm => {
-                let sp = self.get_regs().sp_reg;
+                let sp = self.regs.sp_reg;
                 let imm = self.read_8_bit_immediate(memory) as i8 as i16;
                 let value = ((sp as i16).wrapping_add(imm)) as u16;
                 self.set_reg_pair(RegisterPair::HL, value);
@@ -996,17 +996,17 @@ impl Cpu {
             }
             OpCode::JrImm(None) => {
                 let target_offset = self.read_8_bit_immediate(memory) as i8 as i16;
-                let pc = self.get_regs().pc_reg;
+                let pc = self.regs.pc_reg;
                 let target = (pc as i16).wrapping_add(target_offset) as u16;
-                self.get_mut_regs().pc_reg = target;
+                self.regs.pc_reg = target;
                 Cycles::new(12)
             }
             OpCode::JrImm(Some(condition)) => {
                 let target_offset = self.read_8_bit_immediate(memory) as i8 as i16;
                 if self.check_condition(condition) {
-                    let pc = self.get_regs().pc_reg;
+                    let pc = self.regs.pc_reg;
                     let target = (pc as i16).wrapping_add(target_offset) as u16;
-                    self.get_mut_regs().pc_reg = target;
+                    self.regs.pc_reg = target;
                     Cycles::new(12)
                 } else {
                     Cycles::new(8)
@@ -1014,13 +1014,13 @@ impl Cpu {
             }
             OpCode::Ret(None) => {
                 let value = self.stack_pop(memory);
-                self.get_mut_regs().pc_reg = value;
+                self.regs.pc_reg = value;
                 Cycles::new(16)
             }
             OpCode::Ret(Some(condition)) => {
                 if self.check_condition(condition) {
                     let value = self.stack_pop(memory);
-                    self.get_mut_regs().pc_reg = value;
+                    self.regs.pc_reg = value;
                     Cycles::new(20)
                 } else {
                     Cycles::new(8)
@@ -1028,15 +1028,14 @@ impl Cpu {
             }
             OpCode::Reti => {
                 let value = self.stack_pop(memory);
-                let regs = self.get_mut_regs();
-                regs.pc_reg = value;
-                regs.irq_en = true;
+                self.regs.pc_reg = value;
+                self.regs.irq_en = true;
                 Cycles::new(16)
             }
             OpCode::JpImm(Some(condition)) => {
                 let target = self.read_16_bit_immediate(memory);
                 if self.check_condition(condition) {
-                    self.get_mut_regs().pc_reg = target;
+                    self.regs.pc_reg = target;
                     Cycles::new(16)
                 } else {
                     Cycles::new(12)
@@ -1044,20 +1043,20 @@ impl Cpu {
             }
             OpCode::JpImm(None) => {
                 let target = self.read_16_bit_immediate(memory);
-                self.get_mut_regs().pc_reg = target;
+                self.regs.pc_reg = target;
                 Cycles::new(16)
             }
             OpCode::JpHl => {
                 let target = self.get_reg_pair(RegisterPair::HL);
-                self.get_mut_regs().pc_reg = target;
+                self.regs.pc_reg = target;
                 Cycles::new(4)
             }
             OpCode::CallImm(Some(condition)) => {
                 let target = self.read_16_bit_immediate(memory);
                 if self.check_condition(condition) {
-                    let return_addr = self.get_regs().pc_reg;
+                    let return_addr = self.regs.pc_reg;
                     self.stack_push(memory, return_addr);
-                    self.get_mut_regs().pc_reg = target;
+                    self.regs.pc_reg = target;
                     Cycles::new(24)
                 } else {
                     Cycles::new(12)
@@ -1065,16 +1064,16 @@ impl Cpu {
             }
             OpCode::CallImm(None) => {
                 let target = self.read_16_bit_immediate(memory);
-                let return_addr = self.get_regs().pc_reg;
+                let return_addr = self.regs.pc_reg;
                 self.stack_push(memory, return_addr);
-                self.get_mut_regs().pc_reg = target;
+                self.regs.pc_reg = target;
                 Cycles::new(24)
             }
             OpCode::Reset(target) => {
                 let target = translate_reset_target(target);
-                let return_addr = self.get_regs().pc_reg;
+                let return_addr = self.regs.pc_reg;
                 self.stack_push(memory, return_addr);
-                self.get_mut_regs().pc_reg = target;
+                self.regs.pc_reg = target;
                 Cycles::new(16)
             }
             OpCode::Pop(reg) => {
@@ -1088,12 +1087,12 @@ impl Cpu {
                 Cycles::new(16)
             }
             OpCode::Di => {
-                self.get_mut_regs().irq_en = false;
+                self.regs.irq_en = false;
                 Cycles::new(4)
             }
             OpCode::Ei => {
                 // TODO: make this delayed by 1 instruction
-                self.get_mut_regs().irq_en = true;
+                self.regs.irq_en = true;
                 Cycles::new(4)
             }
             OpCode::Rlca => {
