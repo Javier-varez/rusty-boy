@@ -128,7 +128,19 @@ fn save_file(rom_path: &Path, data: &[u8]) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "profile")]
+fn configure_sched_affinity() -> anyhow::Result<()> {
+    log::info!("Setting CPU affinity");
+    let mut cpuset = nix::sched::CpuSet::new();
+    cpuset.set(0)?; // Just one cpu
+    nix::sched::sched_setaffinity(nix::unistd::Pid::this(), &cpuset)?;
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
+    #[cfg(feature = "profile")]
+    configure_sched_affinity()?;
+
     env_logger::init();
 
     let args = Args::parse();
