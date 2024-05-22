@@ -13,6 +13,7 @@ readme = "../README.md"
 
 [features]
 approximate = []
+profile = ["nix"]
 
 [dependencies]
 cartridge = { path = "../cartridge" }
@@ -25,3 +26,4 @@ sdl2 = "0.36"
 clap = { version = "4.5.4", features = ["derive"] }
 env_logger = "0.11.3"
 log = "0.4"
+nix = { version = "0.28", features = ["sched"], optional = true }
