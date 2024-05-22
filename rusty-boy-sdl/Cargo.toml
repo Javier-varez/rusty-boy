@@ -11,10 +11,13 @@ categories = ["embedded", "gaming"]
 keywords = ["embedded", "gameboy", "playdate"]
 readme = "../README.md"
 
+[features]
+approximate = []
 
 [dependencies]
 cartridge = { path = "../cartridge" }
 ppu = { path = "../ppu" }
+sm83 = { path = "../sm83" }
 rusty-boy = { path = "../rusty-boy" }
 anyhow = "1.0"
 png = "0.17"

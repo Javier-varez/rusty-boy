@@ -138,6 +138,9 @@ fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?;
     let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge);
 
+    #[cfg(feature = "approximate")]
+    rusty_boy.configure_cpu_step(sm83::core::Cycles::new(60));
+
     if rusty_boy.supports_battery_backed_ram() {
         attempt_restore_save_file(&mut rusty_boy, &args.rom_path)?;
     }
@@ -217,6 +220,10 @@ fn main() -> anyhow::Result<()> {
 
         let frame = {
             let frame_start = Instant::now();
+
+            #[cfg(feature = "approximate")]
+            rusty_boy.run_until_next_frame(false);
+
             let frame = rusty_boy.run_until_next_frame(true);
             let frame_end = Instant::now();
             load += frame_end - frame_start;
@@ -244,7 +251,13 @@ fn main() -> anyhow::Result<()> {
             }
         }
 
-        next_deadline += Duration::from_nanos(16_666_667); // 60 fps
+        #[cfg(feature = "approximate")]
+        const FRAME_TIME: Duration = Duration::from_nanos(33_333_333); // 30 fps
+        #[cfg(not(feature = "approximate"))]
+        const FRAME_TIME: Duration = Duration::from_nanos(16_666_667); // 60 fps
+
+        next_deadline += FRAME_TIME;
+
         sleep_until(next_deadline);
 
         frame_id += 1;
