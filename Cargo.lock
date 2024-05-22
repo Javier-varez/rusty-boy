@@ -408,6 +408,7 @@ dependencies = [
  "ppu",
  "rusty-boy",
  "sdl2",
+ "sm83",
 ]
 
 [[package]]
