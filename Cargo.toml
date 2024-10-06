@@ -7,12 +7,34 @@ members = [
     "sm83",
     "sm83_decoder_macros",
     "cartridge",
-    "timer", "rusty-boy-sdl", "rb-disasm",
+    "timer",
+    "rusty-boy-sdl",
+    "rb-disasm",
 ]
 
-exclude = [
-    "rusty-date",
-]
+exclude = ["rusty-date"]
+
+[workspace.dependencies]
+cartridge = { path = "cartridge", version = "0.1.0" }
+ppu = { path = "ppu", version = "0.1.0" }
+rusty-boy = { path = "rusty-boy", version = "0.1.0" }
+sm83 = { path = "sm83", version = "0.1.0" }
+sm83_decoder_macros = { path = "sm83_decoder_macros", version = "0.1.0" }
+timer = { path = "timer", version = "0.1.0" }
+
+anyhow = "1.0"
+clap = { version = "4.5.4", features = ["derive"] }
+env_logger = "0.11.3"
+heapless = "0.8"
+log = "0.4"
+nix = { version = "0.28", features = ["sched"] }
+png = "0.17"
+sdl2 = "0.36"
+serde = { version = "1.0.201", features = ["derive"] }
+static_assertions = "1.1.0"
+tock-registers = "0.9.0"
+toml = "0.8.12"
+
 
 [profile.release]
 debug = true

@@ -12,8 +12,8 @@ keywords = ["embedded", "gameboy", "playdate"]
 readme = "../README.md"
 
 [dependencies]
-sm83 = { path =  "../sm83", version = "0.1.0" }
-ppu = { path =  "../ppu", version = "0.1.0" }
-cartridge = { path =  "../cartridge", version = "0.1.0" }
-timer = { path =  "../timer", version = "0.1.0" }
-log = "0.4.21"
+sm83.workspace = true
+ppu.workspace = true
+cartridge.workspace = true
+timer.workspace = true
+log.workspace = true

@@ -15,8 +15,8 @@ readme = "../README.md"
 profile = []
 
 [dependencies]
-sm83_decoder_macros = { path = "../sm83_decoder_macros" }
+sm83_decoder_macros.workspace = true
 
 [dev-dependencies]
-serde = { version = "1.0.201", features = ["derive"] }
-toml = "0.8.12"
+serde.workspace = true
+toml.workspace = true

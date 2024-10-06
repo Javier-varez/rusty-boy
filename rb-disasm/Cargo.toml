@@ -12,6 +12,6 @@ keywords = ["embedded", "gameboy", "playdate"]
 readme = "../README.md"
 
 [dependencies]
-rusty-boy = { path = "../rusty-boy" }
-anyhow = "1.0"
-clap = { version = "4.5.4", features = ["derive"] }
+rusty-boy.workspace = true
+anyhow.workspace = true
+clap.workspace = true
