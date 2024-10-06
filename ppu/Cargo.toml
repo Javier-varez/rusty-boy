@@ -15,8 +15,8 @@ readme = "../README.md"
 profile = []
 
 [dependencies]
-sm83 = { path =  "../sm83", version = "0.1.0" }
-tock-registers = "0.9.0"
-static_assertions = "1.1.0"
-log = "0.4"
-heapless = "0.8"
+sm83.workspace = true
+tock-registers.workspace = true
+static_assertions.workspace = true
+log.workspace = true
+heapless.workspace = true
