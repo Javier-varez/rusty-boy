@@ -2,3 +2,5 @@ target
 frame_*.png
 *.gb
 build
+.env
+.direnv
