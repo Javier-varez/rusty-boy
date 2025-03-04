@@ -43,15 +43,20 @@
         devShell =
           with pkgs;
           mkShell {
-            buildInputs = [
-              SDL2
-              playdate-sdk.packages.x86_64-linux.default
-              self.packages."${pkgs.system}".crank
-              gcc-arm-embedded-13
-            ];
+            buildInputs =
+              [
+                SDL2
+                self.packages."${pkgs.system}".crank
+                gcc-arm-embedded-13
+              ]
+              ++ (lib.optionals stdenv.isLinux [
+                playdate-sdk.packages.x86_64-linux.default
+              ]);
             RUST_SRC_PATH = rustPlatform.rustLibSrc;
+          }
+          // (lib.optionalAttrs stdenv.isLinux {
             PLAYDATE_SDK_PATH = "${playdate-sdk.packages.x86_64-linux.default}";
-          };
+          });
       }
     );
 }
