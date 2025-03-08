@@ -1,0 +1,10 @@
+[build]
+target = "thumbv7em-none-eabihf"
+
+[target.thumbv7em-none-eabihf]
+rustflags = [
+    "-Z", "emit-stack-sizes",
+    "-C", "relocation-model=pic",
+    "-C", "link-arg=--emit-relocs",
+    "-C", "link-arg=-Tldscript.ld"
+]

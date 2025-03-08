@@ -10,6 +10,7 @@ members = [
     "timer",
     "rusty-boy-sdl",
     "rb-disasm",
+    "xtask",
 ]
 
 exclude = ["rusty-date"]
@@ -34,7 +35,8 @@ serde = { version = "1.0.201", features = ["derive"] }
 static_assertions = "1.1.0"
 tock-registers = "0.9.0"
 toml = "0.8.12"
-
+xshell = "0.2.7"
+termcolor = "1.4.1"
 
 [profile.release]
 debug = true

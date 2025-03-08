@@ -22,15 +22,6 @@
       in
       {
         packages = rec {
-          crank = naersk-lib.buildPackage {
-            src = pkgs.fetchFromGitHub {
-              owner = "pd-rs";
-              repo = "crank";
-              rev = "main";
-              sha256 = "sha256-Le/jW8Ej2qouZ0+8AShbNXyZJBvb/I0H1o4Z+5fv7G8=";
-            };
-          };
-
           rusty-boy = naersk-lib.buildPackage {
             src = ./.;
             root = ./.;
@@ -45,8 +36,8 @@
           mkShell {
             buildInputs =
               [
+                pkg-config
                 SDL2
-                self.packages."${pkgs.system}".crank
                 gcc-arm-embedded-13
               ]
               ++ (lib.optionals stdenv.isLinux [
