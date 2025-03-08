@@ -1,4 +1,5 @@
 #![no_std]
+#![no_main]
 
 mod game_runner;
 mod game_selector;

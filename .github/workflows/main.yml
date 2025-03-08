@@ -34,7 +34,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - run: sudo apt-get install libsdl2-dev
-    - run: cargo build -r
+    - run: cargo xtask build --release
 
   cargo_fmt:
     runs-on: ubuntu-latest
