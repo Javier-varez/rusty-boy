@@ -49,8 +49,6 @@ patches for your system if you find a problem.
 
 In summary, we will need:
 - The `Playdate SDK`.
-- The [`crank`](https://github.com/pd-rs/crank) tool to build the Playdate game.
-- A copy of the `ARM GNU toolchain` that is present in your path.
 - A nightly `Rust` compiler, which is required by [`crankstart`](https://github.com/pd-rs/crankstart.git).
 - The `SDL2` libraries, used for the host builds of `Rusty Boy`.
 
@@ -61,20 +59,12 @@ wget https://download.panic.com/playdate_sdk/Linux/PlaydateSDK-2.4.2.tar.gz
 tar -xf PlaydateSDK-2.4.2.tar.gz
 ```
 
-The processor in the playdate is an `ARM Cortex-M7`, so we also need to install a C toolchain for it.
-On `Ubuntu 22.04` this can be done with:
-
-```sh
-sudo apt-get install gcc-arm-none-eabi
-```
-
 We will need to get a copy of a nightly `Rust` compiler. I suggest you use [`rustup.rs`](https://rustup.rs)
-if you don't yet have it. We will also need the `crank` tool, which acts as a replacement for `cargo`
-when building for the Playdate.
 
 ```sh
-rustup toolchain install nightly
-cargo install --git=https://github.com/pd-rs/crank
+rustup toolchain install nightly-2024-04-30
+rustup target add thumbv7em-none-eabihf --toolchain nightly-2024-04-30
+rustup component add rust-src --toolchain nightly-2024-04-30
 ```
 
 Finally install `SDL2`. On `Ubuntu 22.04` you can do this with:
@@ -85,13 +75,11 @@ sudo apt-get install libsdl2-dev
 
 ### Building
 
-#### Building for the host
-
-`Rusty Boy` can be built for the host with:
+`Rusty Boy` can be built for both the host and the target with:
 
 ```sh
 # Run this command on the root directory of this repository
-cargo build --release
+cargo xtask build --release
 ```
 
 You will find the executable in:
@@ -106,18 +94,8 @@ Now you can run games with:
 ./target/release/rusty-boy-sdl <ROM_PATH>
 ```
 
-#### Building for the Playdate
-
-The Playdate emulator is under the `rusty-date` subdirectory, since it uses its own toolchain that
-makes it incompatible with the rest of targets. Note that the playdate version of `Rusty Boy` for
-`Playdate` is called `Rusty Date`.
-
-```sh
-cd rusty-date
-crank build --device --release
-```
-
-This command builds the `Rusty Date.pdx` game bundle under the `target` folder.
+The Rusty Date application will be located in `rusty-date/build/rusty_date.pdx`.
+Load this application to your Play Date to run the emulator.
 
 ### Running tests
 
@@ -129,7 +107,7 @@ cargo test
 
 ### Loading Rusty Date to your playdate
 
-Follow the instructions for sideloading the game (`Rusty Date.pdx`) as described
+Follow the instructions for sideloading the game (`rusty_date.pdx`) as described
 [here](https://help.play.date/games/sideloading/).
 
 ### Loading ROMs to the playdate
