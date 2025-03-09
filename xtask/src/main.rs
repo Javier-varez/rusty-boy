@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
-use xshell::{Shell, cmd};
+use xshell::{cmd, Shell};
 
 #[derive(Parser)]
 struct BuildArgs {
@@ -95,22 +95,14 @@ fn run_build_playdate(args: &BuildArgs) -> Result<()> {
     cmd!(sh, "cp {elf} {target_elf}").run()?;
     cmd!(sh, "cp {pdxinfo} {target_pdxinfo}").run()?;
 
-    let _env_guard = if let Ok(sdk) = std::env::var("PLAYDATE_SDK_PATH") {
-        Some(if let Ok(path) = std::env::var("PATH") {
-            let mut p = String::new();
-            p.push_str(&sdk);
-            p.push_str("/bin:");
-            p.push_str(&path);
-            sh.push_env("PATH", p)
-        } else {
-            let mut p = String::new();
-            p.push_str(&sdk);
-            p.push_str("/bin");
-            sh.push_env("PATH", p)
-        })
-    } else {
-        None
-    };
+    let _env_guard = std::env::var("PLAYDATE_SDK_PATH").ok().and_then(|sdk| {
+        let path = std::env::var("PATH").ok()?;
+        let mut p = String::new();
+        p.push_str(&sdk);
+        p.push_str("/bin:");
+        p.push_str(&path);
+        Some(sh.push_env("PATH", p))
+    });
 
     cmd!(sh, "pdc {rusty_date_target}").run()?;
 
