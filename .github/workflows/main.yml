@@ -15,7 +15,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: nightly-2024-04-30
+        components: rustfmt, clippy, rust-src
     - run: cargo clippy
 
   cargo_test:
@@ -23,7 +26,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: nightly-2024-04-30
+        components: rustfmt, clippy, rust-src
     - run: sudo apt-get install libsdl2-dev
     - run: cargo test
 
@@ -32,16 +38,31 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        targets: thumbv7em-none-eabihf
+        toolchain: nightly-2024-04-30
+        components: rustfmt, clippy, rust-src
     - run: sudo apt-get install libsdl2-dev
-    - run: cargo xtask build --release
+    - run: |
+        wget https://download.panic.com/playdate_sdk/Linux/PlaydateSDK-2.4.2.tar.gz
+        tar -xf PlaydateSDK-2.4.2.tar.gz
+    - run: PLAYDATE_SDK_PATH=${{ github.workspace }}/PlaydateSDK-2.4.2 cargo xtask build --release
+    - name: Archive rusty-date
+      uses: actions/upload-artifact@v4
+      with:
+        name: rusty-date
+        path: rusty-date/build/rusty_date.pdx
 
   cargo_fmt:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: nightly-2024-04-30
+        components: rustfmt, clippy, rust-src
     - run: cargo fmt --check
 
   cargo_doc:
@@ -49,34 +70,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: nightly-2024-04-30
+        components: rustfmt, clippy, rust-src
     - run: cargo doc
-
-  rusty-date:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@nightly
-      with:
-        targets: thumbv7em-none-eabihf
-        components: rust-src
-    - name: setup job
-      run: |
-        sudo apt-get install gcc-arm-none-eabi
-        cargo install --git=https://github.com/pd-rs/crank
-        wget https://download.panic.com/playdate_sdk/Linux/PlaydateSDK-2.4.2.tar.gz
-        tar -xf PlaydateSDK-2.4.2.tar.gz
-    - run: PLAYDATE_SDK_PATH=${{ github.workspace }}/PlaydateSDK-2.4.2 crank build --device --release
-      working-directory: rusty-date
-    - name: Archive rusty-date
-      uses: actions/upload-artifact@v4
-      with:
-        name: rusty-date
-        path: rusty-date/target/Rusty Date.pdx
 
   cargo-deny:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: EmbarkStudios/cargo-deny-action@v1
+    - uses: EmbarkStudios/cargo-deny-action@v2.0.10
