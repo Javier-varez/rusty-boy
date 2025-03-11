@@ -11,6 +11,12 @@ pub struct DmaEngine {
     current_element: u16,
 }
 
+impl Default for DmaEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DmaEngine {
     pub fn new() -> Self {
         Self {

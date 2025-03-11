@@ -71,7 +71,7 @@ impl Mbc1 {
 }
 
 impl Mapper for Mbc1 {
-    fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
+    fn header(&self) -> Result<CartridgeHeader<'_>, header::Error> {
         CartridgeHeader::try_new(&self.rom)
     }
 

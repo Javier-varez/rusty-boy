@@ -44,6 +44,12 @@ static_assertions::const_assert_eq!(NUM_CYCLES_PER_DIV_TICK, 256);
 const HIDDEN_BITS: u32 = NUM_CYCLES_PER_DIV_TICK.trailing_zeros();
 static_assertions::const_assert_eq!(HIDDEN_BITS, 8);
 
+impl Default for Timer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Timer {
     pub const fn new() -> Self {
         Self {
@@ -72,7 +78,7 @@ impl Timer {
         // TODO: do not run timer if cpu is disabled
 
         let cycles: usize = cycles.into();
-        debug_assert!(cycles <= <u16 as Into<usize>>::into(u16::max_value()));
+        debug_assert!(cycles <= <u16 as Into<usize>>::into(u16::MAX));
 
         let prev_div = self.div;
         let (cur_div, div_overflow) = if self.request_div_reset {

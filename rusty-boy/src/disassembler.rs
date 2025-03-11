@@ -39,11 +39,8 @@ impl<'a> Disassembler<'a> {
     pub fn disassemble(&self) -> Result<InstructionIter<Cloned<Iter<'a, u8>>>, Error> {
         let mut entrypoint = None;
         for (_addr, insn) in InstructionIter::new(self.header()?.entrypoint, 0x100) {
-            match insn {
-                Instruction::JpImm(None, imm) => {
-                    entrypoint = Some(imm);
-                }
-                _ => {}
+            if let Instruction::JpImm(None, imm) = insn {
+                entrypoint = Some(imm);
             }
         }
 

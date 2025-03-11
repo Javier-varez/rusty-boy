@@ -137,7 +137,11 @@ impl TileBlock {
         for tile in tile_block.iter_mut() {
             tile.write(Tile::new());
         }
-        Self(unsafe { core::mem::transmute::<_, [Tile; TILES_PER_BLOCK]>(tile_block) })
+        Self(unsafe {
+            core::mem::transmute::<[MaybeUninit<Tile>; TILES_PER_BLOCK], [Tile; TILES_PER_BLOCK]>(
+                tile_block,
+            )
+        })
     }
 
     fn block_address_to_tile_address(
@@ -207,7 +211,10 @@ impl TileMap {
         }
 
         Self(unsafe {
-            core::mem::transmute::<_, [[TileIndex; TILE_MAP_WIDTH]; TILE_MAP_HEIGHT]>(tile_map)
+            core::mem::transmute::<
+                [[MaybeUninit<TileIndex>; TILE_MAP_WIDTH]; TILE_MAP_HEIGHT],
+                [[TileIndex; TILE_MAP_WIDTH]; TILE_MAP_HEIGHT],
+            >(tile_map)
         })
     }
 
@@ -244,6 +251,12 @@ static_assertions::assert_eq_size!([u8; 0x2000], VramImpl);
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Vram(Box<VramImpl>);
 
+impl Default for Vram {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Vram {
     const VRAM_BASE: u16 = 0x8000;
     const TILE_MAP_BASE: u16 = 0x9800;
@@ -263,9 +276,17 @@ impl Vram {
 
         Self(Box::new(VramImpl {
             tile_blocks: unsafe {
-                core::mem::transmute::<_, [TileBlock; NUM_TILE_BLOCKS]>(tile_blocks)
+                core::mem::transmute::<
+                    [MaybeUninit<TileBlock>; NUM_TILE_BLOCKS],
+                    [TileBlock; NUM_TILE_BLOCKS],
+                >(tile_blocks)
             },
-            tile_maps: unsafe { core::mem::transmute::<_, [TileMap; NUM_TILE_MAPS]>(tile_maps) },
+            tile_maps: unsafe {
+                core::mem::transmute::<
+                    [MaybeUninit<TileMap>; NUM_TILE_MAPS],
+                    [TileMap; NUM_TILE_MAPS],
+                >(tile_maps)
+            },
         }))
     }
 

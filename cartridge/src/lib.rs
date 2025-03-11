@@ -86,26 +86,26 @@ impl Cartridge {
 
     /// Returns the header of the current cartridge. Note that the header keeps borrowed data of
     /// the cartridge.
-    pub fn header<'a>(&'a self) -> CartridgeHeader<'a> {
+    pub fn header(&self) -> CartridgeHeader<'_> {
         self.mapper.header().unwrap()
     }
 
     /// Returns true if the cartridge has a battery to keep RAM powered while the GameBoy is off.
     pub fn has_battery(&self) -> bool {
-        match self.header().cartridge_type {
+        matches!(
+            self.header().cartridge_type,
             CartridgeType::Mbc1RamBattery
-            | CartridgeType::Mbc2Battery
-            | CartridgeType::RomRamBattery
-            | CartridgeType::Mmm01RamBattery
-            | CartridgeType::Mbc3TimerBattery
-            | CartridgeType::Mbc3TimerRamBattery
-            | CartridgeType::Mbc3RamBattery
-            | CartridgeType::Mbc5RamBattery
-            | CartridgeType::Mbc5RumbleRamBattery
-            | CartridgeType::Mbc7SensorRumbleRamBattery
-            | CartridgeType::Huc1RamBattery => true,
-            _ => false,
-        }
+                | CartridgeType::Mbc2Battery
+                | CartridgeType::RomRamBattery
+                | CartridgeType::Mmm01RamBattery
+                | CartridgeType::Mbc3TimerBattery
+                | CartridgeType::Mbc3TimerRamBattery
+                | CartridgeType::Mbc3RamBattery
+                | CartridgeType::Mbc5RamBattery
+                | CartridgeType::Mbc5RumbleRamBattery
+                | CartridgeType::Mbc7SensorRumbleRamBattery
+                | CartridgeType::Huc1RamBattery
+        )
     }
 
     /// Returns a slice of the RAM that is battery-backed in the cartridge.

@@ -7,6 +7,12 @@ pub struct InterruptRegs {
     flags_reg: Interrupts,
 }
 
+impl Default for InterruptRegs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InterruptRegs {
     /// Constructs the interrupt registers
     pub fn new() -> Self {

@@ -87,7 +87,7 @@ impl GameSelector {
     }
 
     pub fn draw_picker(&self, font: &Font) -> Result<(), anyhow::Error> {
-        if self.choices.len() == 0 {
+        if self.choices.is_empty() {
             return self.draw_empty_picker(font);
         }
 
@@ -126,7 +126,7 @@ impl GameSelector {
             )?;
 
             graphics.set_draw_mode(crankstart_sys::LCDBitmapDrawMode::kDrawModeNXOR)?;
-            graphics.draw_text(&c, Point2D::new(PADDING * 2, y_text_offset))?;
+            graphics.draw_text(c, Point2D::new(PADDING * 2, y_text_offset))?;
             y_rect_offset += BOX_HEIGHT;
             y_text_offset += BOX_HEIGHT;
         }
@@ -136,20 +136,16 @@ impl GameSelector {
 
     pub fn update(&mut self, font: &Font) -> Result<Option<Rom>, anyhow::Error> {
         let (_, pushed, _) = System::get().get_button_state()?;
-        if (pushed & PDButtons::kButtonA).0 != 0 && self.choices.len() > 0 {
+        if (pushed & PDButtons::kButtonA).0 != 0 && !self.choices.is_empty() {
             let fs = FileSystem::get();
             return Ok(Some(load_file(&fs, &self.choices[self.index])?));
         }
 
-        if (pushed & PDButtons::kButtonDown).0 != 0 {
-            if self.index < self.choices.len() - 1 {
-                self.index += 1;
-            }
+        if (pushed & PDButtons::kButtonDown).0 != 0 && self.index < self.choices.len() - 1 {
+            self.index += 1;
         }
-        if (pushed & PDButtons::kButtonUp).0 != 0 {
-            if self.index > 0 {
-                self.index -= 1;
-            }
+        if (pushed & PDButtons::kButtonUp).0 != 0 && self.index > 0 {
+            self.index -= 1;
         }
 
         self.draw_picker(font)?;

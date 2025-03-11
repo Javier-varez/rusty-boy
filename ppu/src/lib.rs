@@ -129,10 +129,17 @@ fn mode_for_current_cycle_count(line_cycles: Cycles, line: usize) -> Mode {
     }
 }
 
+impl Default for Ppu {
+    fn default() -> Self {
+        Ppu::new()
+    }
+}
+
 impl Ppu {
     /// Constructs a PPU instance
     pub fn new() -> Self {
-        let mut framebuffer: [[core::mem::MaybeUninit<Color>; DISPLAY_WIDTH]; DISPLAY_HEIGHT] =
+        type UninitFrame = [[core::mem::MaybeUninit<Color>; DISPLAY_WIDTH]; DISPLAY_HEIGHT];
+        let mut framebuffer: UninitFrame =
             [[core::mem::MaybeUninit::uninit(); DISPLAY_WIDTH]; DISPLAY_HEIGHT];
 
         for row in framebuffer.iter_mut() {
@@ -152,7 +159,9 @@ impl Ppu {
 
             stat_irq: false,
             selected_oam_entries: heapless::Vec::new(),
-            framebuffer: Box::new(unsafe { core::mem::transmute::<_, Frame>(framebuffer) }),
+            framebuffer: Box::new(unsafe {
+                core::mem::transmute::<UninitFrame, Frame>(framebuffer)
+            }),
         }
     }
 
@@ -307,13 +316,12 @@ impl Ppu {
             .iter()
             .cycle()
             .skip(x_tile_offset)
-            .map(|tile_index| {
+            .flat_map(|tile_index| {
                 self.vram
                     .get_tile(*tile_index, bg_tile_data_area)
                     .get_line(tile_line_idx)
                     .iter()
             })
-            .flatten()
             .skip(x_inner_offset)
             .take(DISPLAY_WIDTH);
 
@@ -367,13 +375,12 @@ impl Ppu {
             .get_win_tile_map(win_tile_map)
             .line(win_line)
             .iter()
-            .map(|tile_idx| {
+            .flat_map(|tile_idx| {
                 self.vram
                     .get_tile(*tile_idx, win_tile_data_area)
                     .get_line(tile_line_idx)
                     .iter()
             })
-            .flatten()
             .skip(disp_x_initial_skip);
 
         line.iter_mut()
@@ -435,7 +442,7 @@ impl Ppu {
                 }
 
                 let x = if x_flip { OBJ_OFFSET_X - 1 - i } else { i } + object.x as usize;
-                if x < OBJ_OFFSET_X || x >= DISPLAY_WIDTH + OBJ_OFFSET_X {
+                if !(OBJ_OFFSET_X..OBJ_OFFSET_X + DISPLAY_WIDTH).contains(&x) {
                     continue;
                 }
                 let x = x - OBJ_OFFSET_X;
