@@ -5,6 +5,12 @@ pub struct Joypad {
     sel_dpad: bool,
 }
 
+impl Default for Joypad {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Joypad {
     pub const fn new() -> Self {
         Self {
@@ -62,6 +68,12 @@ pub struct State {
     pub b: bool,
     pub start: bool,
     pub select: bool,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl State {

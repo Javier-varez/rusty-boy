@@ -317,7 +317,7 @@ const fn sra(value: u8) -> (u8, Flags) {
 
 #[cfg_attr(feature = "profile", inline(never))]
 const fn swap(value: u8) -> (u8, Flags) {
-    let swapped = (value >> 4) | (value << 4);
+    let swapped = value.rotate_left(4);
     let flags = Flags::new().with(Flag::Z, swapped == 0);
     (swapped, flags)
 }
@@ -447,6 +447,12 @@ pub enum ExitReason {
 pub struct Cpu {
     regs: Registers,
     halted: bool,
+}
+
+impl Default for Cpu {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Cpu {

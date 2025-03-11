@@ -31,9 +31,9 @@ fn save_png(idx: usize, frame: &[[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT]) -> any
 
     const MAX: u8 = 255;
     let frame: Vec<u8> = frame
-        .into_iter()
+        .iter()
         .flat_map(|l| {
-            l.into_iter().map(|c| match c {
+            l.iter().map(|c| match c {
                 Color::White => MAX,
                 Color::LightGrey => MAX / 3 * 2,
                 Color::DarkGrey => MAX / 3,

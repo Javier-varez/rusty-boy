@@ -59,9 +59,10 @@ struct Program {
 }
 
 /// The exit reason of the CPU after stepping an instruction.
-#[derive(Debug, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Default)]
 pub enum StepExitReason {
     /// The step of the instruction concluded successfully, and took the given number of clock cycles.
+    #[default]
     Step,
     /// An interrupt was taken, and and took the given number of clock cycles.
     InterruptTaken,
@@ -71,12 +72,6 @@ pub enum StepExitReason {
     Halt,
     /// The CPU attempted to execute an illegal OpCode.
     IllegalOpcode,
-}
-
-impl Default for StepExitReason {
-    fn default() -> Self {
-        StepExitReason::Step
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -145,7 +140,7 @@ fn parse_u16(string: &str) -> u16 {
     if string.starts_with("0x") {
         u16::from_str_radix(string.trim_start_matches("0x"), 16).unwrap()
     } else {
-        u16::from_str_radix(string, 10).unwrap()
+        string.parse::<u16>().unwrap()
     }
 }
 
@@ -197,7 +192,7 @@ fn translate_exit_reason(exit_reason: ExitReason) -> StepExitReason {
 
 fn translate_interrupts(interrupts: &[TestInterrupt]) -> Interrupts {
     interrupts
-        .into_iter()
+        .iter()
         .map(|i| {
             let i: Interrupt = i.into();
             i

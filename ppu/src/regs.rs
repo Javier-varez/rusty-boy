@@ -132,6 +132,12 @@ pub struct Registers {
     pub(crate) wx: u8,
 }
 
+impl Default for Registers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Registers {
     pub const fn new() -> Self {
         Self {

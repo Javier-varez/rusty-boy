@@ -17,7 +17,7 @@ impl RomOnly {
 }
 
 impl Mapper for RomOnly {
-    fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error> {
+    fn header(&self) -> Result<CartridgeHeader<'_>, header::Error> {
         CartridgeHeader::try_new(&self.data)
     }
 

@@ -41,8 +41,12 @@ impl GbAddressSpace {
         Self {
             cartridge,
             ppu: Ppu::new(),
-            wram: Box::new(unsafe { core::mem::transmute::<_, [u8; 0x2000]>(wram) }),
-            hram: Box::new(unsafe { core::mem::transmute::<_, [u8; 0x7f]>(hram) }),
+            wram: Box::new(unsafe {
+                core::mem::transmute::<[MaybeUninit<u8>; 0x2000], [u8; 0x2000]>(wram)
+            }),
+            hram: Box::new(unsafe {
+                core::mem::transmute::<[MaybeUninit<u8>; 0x7f], [u8; 0x7f]>(hram)
+            }),
             interrupt_regs: InterruptRegs::new(),
             joypad: Joypad::new(),
             timer: Timer::new(),

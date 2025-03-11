@@ -18,7 +18,7 @@ mod rom_only;
 pub trait Mapper {
     /// Obtains the header of the cartridge. It can fail if the rom does not contain enough data
     /// for the header or the title of the game is not a valid string.
-    fn header<'a>(&'a self) -> Result<CartridgeHeader<'a>, header::Error>;
+    fn header(&self) -> Result<CartridgeHeader<'_>, header::Error>;
 
     /// Reads the given memory-mapped address of the cartridge. Panics if the address does not
     /// belong the address space of the cartridge (0x0000 to 0x8000 or 0xA000 to 0xC000).

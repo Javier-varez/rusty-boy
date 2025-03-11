@@ -66,7 +66,7 @@ fn save_game(fs: &FileSystem, name: &str, data: &[u8]) -> Result<(), anyhow::Err
 
     let path = format!("savegames/{name}.save");
     let file = fs.open(&path, FileOptions::kFileWrite)?;
-    file.write(&data)?;
+    file.write(data)?;
     Ok(())
 }
 

@@ -56,6 +56,12 @@ pub struct Object {
 const OBJECT_SIZE: usize = 4;
 assert_eq_size!([u8; OBJECT_SIZE], Object);
 
+impl Default for Object {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Object {
     pub const fn new() -> Self {
         Self {
@@ -102,19 +108,29 @@ pub struct Oam {
     objects: Box<[Object; NUM_OBJECTS]>,
 }
 
+impl Default for Oam {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Oam {
     const OAM_BASE: usize = 0xFE00;
 
     pub fn new() -> Self {
-        const UNINIT: MaybeUninit<Object> = MaybeUninit::uninit();
-        let mut objects = [UNINIT; NUM_OBJECTS];
+        let mut objects = [const { MaybeUninit::uninit() }; NUM_OBJECTS];
 
         for elem in objects.iter_mut() {
             elem.write(Object::new());
         }
 
         Self {
-            objects: unsafe { Box::new(core::mem::transmute::<_, [Object; NUM_OBJECTS]>(objects)) },
+            objects: unsafe {
+                Box::new(core::mem::transmute::<
+                    [MaybeUninit<Object>; NUM_OBJECTS],
+                    [Object; NUM_OBJECTS],
+                >(objects))
+            },
         }
     }
 

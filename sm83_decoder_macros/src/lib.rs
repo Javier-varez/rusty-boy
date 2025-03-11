@@ -70,7 +70,7 @@ struct Field<'a> {
     var_name: char,
 }
 
-impl<'a> Field<'a> {
+impl Field<'_> {
     fn value_mask(&self) -> usize {
         1 << (self.msb - self.lsb + 1)
     }
@@ -392,7 +392,7 @@ impl Parse for Declarations {
 
 impl Declarations {
     fn find_type(&self, ty: &syn::Ident) -> Option<&Declaration> {
-        return self.decls.iter().find(|d| d.ident == *ty);
+        self.decls.iter().find(|d| d.ident == *ty)
     }
 }
 
