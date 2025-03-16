@@ -5,6 +5,10 @@ use clap::Parser;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use xshell::{cmd, Shell};
 
+mod stack;
+
+use stack::check_stack_sizes;
+
 #[derive(Parser)]
 struct BuildArgs {
     /// Build in release mode
@@ -16,6 +20,7 @@ struct BuildArgs {
 enum Commands {
     Build(BuildArgs),
     Clean,
+    Check,
 }
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -35,6 +40,16 @@ fn rusty_date_path() -> PathBuf {
     path.push("rusty-date");
     path
 }
+
+fn rusty_date_elf_path(release: bool) -> PathBuf {
+    let mut elf = rusty_date_path();
+    elf.push("target");
+    elf.push("thumbv7em-none-eabihf");
+    elf.push(if release { "release" } else { "debug" });
+    elf.push("rusty-date");
+    elf
+}
+
 fn print_header(message: &str) -> Result<()> {
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
     stdout.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
@@ -72,11 +87,7 @@ fn run_build_playdate(args: &BuildArgs) -> Result<()> {
         cmd.run()?;
     }
 
-    let mut elf = rusty_date_path.clone();
-    elf.push("target");
-    elf.push("thumbv7em-none-eabihf");
-    elf.push("release");
-    elf.push("rusty-date");
+    let elf = rusty_date_elf_path(args.release);
 
     let mut pdxinfo = rusty_date_path.clone();
     pdxinfo.push("pdxinfo");
@@ -145,6 +156,28 @@ fn run_clean() -> Result<()> {
     Ok(())
 }
 
+fn run_check() -> Result<()> {
+    let release = true;
+    run_build(&BuildArgs { release })?;
+    let rusty_date = rusty_date_elf_path(release);
+
+    let stack_sizes = check_stack_sizes(&rusty_date)?;
+
+    const NUM_FUNCTIONS: usize = 10;
+
+    let max_name_len = stack_sizes
+        .iter()
+        .take(NUM_FUNCTIONS)
+        .map(|(name, _)| name.len())
+        .max()
+        .unwrap_or(0);
+    for (name, size) in stack_sizes.iter().take(NUM_FUNCTIONS) {
+        println!("{name:width$}: {size}", width = max_name_len + 2);
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let command = Commands::parse();
 
@@ -154,6 +187,9 @@ fn main() -> Result<()> {
         }
         Commands::Clean => {
             run_clean()?;
+        }
+        Commands::Check => {
+            run_check()?;
         }
     }
 

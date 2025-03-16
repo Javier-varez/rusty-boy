@@ -81,7 +81,7 @@ SECTIONS
 
 	} : program
 
-    .stack_sizes 0 (NOLOAD) : { *(.stack_sizes) }
+    .stack_sizes : { KEEP(*(.stack_sizes)) }
 
   /DISCARD/ :
   {
