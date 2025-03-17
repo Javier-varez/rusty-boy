@@ -139,8 +139,8 @@ impl Ppu {
     /// Constructs a PPU instance
     pub fn new() -> Self {
         type UninitFrame = [[core::mem::MaybeUninit<Color>; DISPLAY_WIDTH]; DISPLAY_HEIGHT];
-        let mut framebuffer: UninitFrame =
-            [[core::mem::MaybeUninit::uninit(); DISPLAY_WIDTH]; DISPLAY_HEIGHT];
+        let mut framebuffer: Box<UninitFrame> =
+            Box::new([[core::mem::MaybeUninit::uninit(); DISPLAY_WIDTH]; DISPLAY_HEIGHT]);
 
         for row in framebuffer.iter_mut() {
             for elem in row {
@@ -159,9 +159,9 @@ impl Ppu {
 
             stat_irq: false,
             selected_oam_entries: heapless::Vec::new(),
-            framebuffer: Box::new(unsafe {
-                core::mem::transmute::<UninitFrame, Frame>(framebuffer)
-            }),
+            framebuffer: unsafe {
+                core::mem::transmute::<Box<UninitFrame>, Box<Frame>>(framebuffer)
+            },
         }
     }
 

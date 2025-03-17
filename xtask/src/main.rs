@@ -25,7 +25,7 @@ enum Commands {
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-const NIGHTLY_TOOLCHAIN: &str = "nightly-2024-04-30";
+const NIGHTLY_TOOLCHAIN: &str = "nightly-2025-03-15";
 
 fn project_root() -> PathBuf {
     Path::new(&env!("CARGO_MANIFEST_DIR"))
