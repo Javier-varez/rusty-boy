@@ -19,6 +19,7 @@ jobs:
       with:
         toolchain: nightly-2025-03-15
         components: rustfmt, clippy, rust-src
+    - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo clippy
 
   cargo_test:
@@ -30,7 +31,7 @@ jobs:
       with:
         toolchain: nightly-2025-03-15
         components: rustfmt, clippy, rust-src
-    - run: sudo apt-get install libsdl2-dev
+    - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo test
 
   cargo_build:
@@ -43,7 +44,7 @@ jobs:
         targets: thumbv7em-none-eabihf
         toolchain: nightly-2025-03-15
         components: rustfmt, clippy, rust-src
-    - run: sudo apt-get install libsdl2-dev
+    - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: |
         wget https://download.panic.com/playdate_sdk/Linux/PlaydateSDK-2.4.2.tar.gz
         tar -xf PlaydateSDK-2.4.2.tar.gz
@@ -63,6 +64,7 @@ jobs:
       with:
         toolchain: nightly-2025-03-15
         components: rustfmt, clippy, rust-src
+    - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo fmt --check
 
   cargo_doc:
@@ -74,6 +76,7 @@ jobs:
       with:
         toolchain: nightly-2025-03-15
         components: rustfmt, clippy, rust-src
+    - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo doc
 
   cargo-deny:
