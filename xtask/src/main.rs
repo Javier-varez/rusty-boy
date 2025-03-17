@@ -1,10 +1,14 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
+use anyhow::Result;
 use clap::Parser;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use xshell::{cmd, Shell};
 
+mod disk;
+mod playdate;
 mod stack;
 
 use stack::check_stack_sizes;
@@ -17,13 +21,23 @@ struct BuildArgs {
 }
 
 #[derive(Parser)]
+struct LoadArgs {
+    /// Build in release mode
+    #[arg(short, long)]
+    release: bool,
+
+    /// Whether to run the game after loading it
+    #[arg(long)]
+    run: bool,
+}
+
+#[derive(Parser)]
 enum Commands {
     Build(BuildArgs),
     Clean,
     Check,
+    Load(LoadArgs),
 }
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 const NIGHTLY_TOOLCHAIN: &str = "nightly-2025-03-15";
 
@@ -48,6 +62,15 @@ fn rusty_date_elf_path(release: bool) -> PathBuf {
     elf.push(if release { "release" } else { "debug" });
     elf.push("rusty-date");
     elf
+}
+
+const PDX_NAME: &str = "rusty_date.pdx";
+
+fn rusty_date_pdx_path() -> PathBuf {
+    let mut rusty_date_target = rusty_date_path();
+    rusty_date_target.push("build");
+    rusty_date_target.push(PDX_NAME);
+    rusty_date_target
 }
 
 fn print_header(message: &str) -> Result<()> {
@@ -178,6 +201,24 @@ fn run_check() -> Result<()> {
     Ok(())
 }
 
+fn run_load(args: &LoadArgs) -> Result<()> {
+    run_build(&BuildArgs {
+        release: args.release,
+    })?;
+    let pdx = rusty_date_pdx_path();
+
+    let mut pd = playdate::Playdate::open()?;
+    pd.load_game(&pdx)?;
+
+    if args.run {
+        // Give the playdate some time to enumerate
+        pd.wait_for_connection(Duration::from_secs(10))?;
+        pd.run_game(PDX_NAME)?;
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let command = Commands::parse();
 
@@ -190,6 +231,9 @@ fn main() -> Result<()> {
         }
         Commands::Check => {
             run_check()?;
+        }
+        Commands::Load(args) => {
+            run_load(&args)?;
         }
     }
 
