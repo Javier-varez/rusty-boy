@@ -39,6 +39,8 @@
                 pkg-config
                 SDL2
                 gcc-arm-embedded-13
+                rgbds # For building game boy test games from source
+                gnumake
               ]
               ++ (lib.optionals stdenv.isLinux [
                 playdate-sdk.packages.x86_64-linux.default
