@@ -1,9 +1,8 @@
 use std::path::Path;
 
+use anyhow::Result;
 use goblin::elf::Elf;
 use rustc_demangle::demangle;
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn parse_leb128(data: &[u8]) -> (u128, &[u8]) {
     const WORD_MASK: u8 = 0x7f;
