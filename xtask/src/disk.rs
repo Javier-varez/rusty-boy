@@ -5,7 +5,7 @@ use std::path::PathBuf;
 mod linux;
 
 #[cfg(target_os = "linux")]
-pub fn find_playdate_data_disk() -> Result<Option<PathBuf>> {
+pub fn find_playdate_data_disk() -> Result<Option<(String, PathBuf)>> {
     todo!()
 }
 
