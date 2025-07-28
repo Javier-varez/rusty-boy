@@ -44,6 +44,8 @@ jobs:
         targets: thumbv7em-none-eabihf
         toolchain: nightly-2025-03-15
         components: rustfmt, clippy, rust-src
+    - run: rustup toolchain install 1.88.0
+    - run: rustup target add wasm32-unknown-unknown --toolchain 1.88.0
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo install trunk
     - run: |
