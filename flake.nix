@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     naersk.url = "github:nix-community/naersk/master";
     utils.url = "github:numtide/flake-utils";
     playdate-sdk.url = "github:RegularTetragon/playdate-sdk-flake";
@@ -41,6 +41,10 @@
                 gcc-arm-embedded-13
                 rgbds # For building game boy test games from source
                 gnumake
+                udev
+                trunk
+                wasm-bindgen-cli
+                dart-sass
               ]
               ++ (lib.optionals stdenv.isLinux [
                 playdate-sdk.packages.x86_64-linux.default

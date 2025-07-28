@@ -52,13 +52,14 @@ fn loader(props: &Props) -> Html {
 
     html! {
         <>
-        <div>
-            <label for="rom">{"Choose a ROM file:"}</label>
-            <input type="file" id="rom" name="rom" ref={input_ref} />
-        </div>
+        <div class="mx-5">
+            <div class="input-group mb-3">
+                <input type="file" id="rom" name="rom" ref={input_ref} class="form-control"/>
+                <button type="button" class="btn btn-outline-secondary" onclick={action}>{"Start game!"}</button>
+            </div>
 
-        <div>
-            <button onclick={action}>{"Start game!"}</button>
+            <div>
+            </div>
         </div>
         </>
     }
@@ -70,6 +71,7 @@ struct Game {
     joypad_state: rusty_boy::joypad::State,
     tick_closure: Closure<dyn Fn()>,
     keyboard_closure: Closure<dyn Fn(KeyboardEvent)>,
+    game_name: String,
 }
 
 enum GameMessage {
@@ -119,6 +121,7 @@ impl Component for Game {
             joypad_state: Default::default(),
             tick_closure,
             keyboard_closure,
+            game_name: title,
         }
     }
 
@@ -201,7 +204,14 @@ impl Component for Game {
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
-            <canvas ref={self.canvas.clone()} />
+            <div class="d-flex justify-content-center card">
+                <div class="card-header">
+                    {&self.game_name}
+                </div>
+                <div class="card-body">
+                    <canvas ref={self.canvas.clone()} class="game-canvas d-flex justify-content-center "/>
+                </div>
+            </div>
         }
     }
 }
@@ -212,15 +222,21 @@ fn app() -> Html {
 
     html! {
         <>
-        <h1>{ "Rusty Boy - Wasm Edition" }</h1>
+            <nav class="navbar bg-body-tertiary">
+                <div class="container-fluid">
+                    <span class="navbar-brand mb-0 h1">{ "Rusty Boy - Wasm Edition" }</span>
+                </div>
+            </nav>
 
-        if file.is_none() {
-            <Loader game_data={file}>
-            </Loader>
-        } else {
-            <Game game_data={file}>
-            </Game>
-        }
+            <div class="container">
+                if file.is_none() {
+                    <Loader game_data={file}>
+                    </Loader>
+                } else {
+                    <Game game_data={file}>
+                    </Game>
+                }
+            </div>
         </>
     }
 }
