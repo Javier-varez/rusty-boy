@@ -17,7 +17,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@v1
       with:
-        toolchain: nightly-2025-03-15
+        toolchain: 1.88.0
         components: rustfmt, clippy, rust-src
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo clippy
@@ -29,7 +29,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@v1
       with:
-        toolchain: nightly-2025-03-15
+        toolchain: 1.88.0
         components: rustfmt, clippy, rust-src
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo test
@@ -45,6 +45,7 @@ jobs:
         toolchain: nightly-2025-03-15
         components: rustfmt, clippy, rust-src
     - run: sudo apt-get install libsdl2-dev libudev-dev
+    - run: cargo install trunk
     - run: |
         wget https://download.panic.com/playdate_sdk/Linux/PlaydateSDK-2.4.2.tar.gz
         tar -xf PlaydateSDK-2.4.2.tar.gz
@@ -62,7 +63,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@v1
       with:
-        toolchain: nightly-2025-03-15
+        toolchain: 1.88.0
         components: rustfmt, clippy, rust-src
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo fmt --check
@@ -74,7 +75,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@v1
       with:
-        toolchain: nightly-2025-03-15
+        toolchain: 1.88.0
         components: rustfmt, clippy, rust-src
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo doc
