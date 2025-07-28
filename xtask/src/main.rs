@@ -143,9 +143,23 @@ fn run_build_playdate(args: &BuildArgs) -> Result<()> {
     Ok(())
 }
 
+fn run_build_wasm(args: &BuildArgs) -> Result<()> {
+    print_header("Wasm build")?;
+    let sh = Shell::new()?;
+    let _dir = sh.push_dir("rusty-boy-wasm");
+    let mut cmd = cmd!(sh, "trunk build");
+    if args.release {
+        cmd = cmd.arg("--release");
+    }
+    cmd.run()?;
+
+    Ok(())
+}
+
 fn run_build(args: &BuildArgs) -> Result<()> {
     run_build_native(args)?;
     run_build_playdate(args)?;
+    run_build_wasm(args)?;
 
     Ok(())
 }

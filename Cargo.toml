@@ -2,14 +2,15 @@
 resolver = "2"
 
 members = [
+    "cartridge",
     "ppu",
+    "rb-disasm",
     "rusty-boy",
+    "rusty-boy-sdl",
+    "rusty-boy-wasm",
     "sm83",
     "sm83_decoder_macros",
-    "cartridge",
     "timer",
-    "rusty-boy-sdl",
-    "rb-disasm",
     "xtask",
 ]
 

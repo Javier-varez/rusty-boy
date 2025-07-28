@@ -4,3 +4,4 @@ frame_*.png
 build
 .env
 .direnv
+dist

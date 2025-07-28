@@ -1,0 +1,22 @@
+[package]
+name = "rusty-boy-wasm"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["Javier Alvarez <javier.alvarez@allthingsembedded.net>"]
+description = "Game Boy Emulator for the modern browser"
+homepage = "https://github.com/Javier-varez/rusty-boy"
+repository = "https://github.com/Javier-varez/rusty-boy"
+categories = ["gaming"]
+keywords = ["gameboy", "playdate", "wasm"]
+readme = "../README.md"
+
+[dependencies]
+anyhow.workspace = true
+cartridge.workspace = true
+ppu.workspace = true
+rusty-boy.workspace = true
+sm83.workspace = true
+wasm-bindgen = "0.2.100"
+web-sys = { version = "0.3.77", features = ["HtmlCanvasElement", "CanvasRenderingContext2d", "ImageData"] }
+yew = { version = "0.21", features = ["csr"] }
