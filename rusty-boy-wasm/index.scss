@@ -1,11 +1,15 @@
-.container {
-  padding: 20px;
-  max-width: 1160px;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  text-align: center;
-  justify-content: center;
+// .container {
+//   padding: 20px;
+//   max-width: 1160px;
+//   display: block;
+//   margin-left: auto;
+//   margin-right: auto;
+//   text-align: center;
+//   justify-content: center;
+// }
+
+html, body {
+  height: 100%;
 }
 
 .card {
