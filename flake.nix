@@ -41,13 +41,13 @@
                 gcc-arm-embedded-13
                 rgbds # For building game boy test games from source
                 gnumake
-                udev
                 trunk
                 wasm-bindgen-cli
                 dart-sass
               ]
               ++ (lib.optionals stdenv.isLinux [
                 playdate-sdk.packages.x86_64-linux.default
+                udev
               ]);
             RUST_SRC_PATH = rustPlatform.rustLibSrc;
           }
