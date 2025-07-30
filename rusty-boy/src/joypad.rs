@@ -59,6 +59,7 @@ impl Joypad {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 pub struct State {
     pub left: bool,
     pub right: bool,

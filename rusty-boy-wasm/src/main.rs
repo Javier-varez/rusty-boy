@@ -3,6 +3,7 @@ mod error;
 mod game;
 mod header;
 mod icon;
+mod joypad;
 mod theme;
 
 use app::App;
