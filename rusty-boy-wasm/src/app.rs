@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
-use web_sys::FileReader;
+use web_sys::{FileReader, HtmlInputElement};
 use yew::prelude::*;
 
 use crate::game::Game;
@@ -16,117 +16,102 @@ pub enum AppState {
     Running,
 }
 
-pub enum AppMessage {}
+#[derive(Debug)]
+pub enum AppMessage {
+    ToggleTheme,
+    OpenEvent(HtmlInputElement),
+    FileLoaded(Vec<u8>),
+}
 
 pub(super) struct App {
     app_state: Rc<RefCell<AppState>>,
-    theme: Rc<RefCell<Theme>>,
-    on_load_file: Rc<RefCell<Closure<dyn Fn()>>>,
-    file_reader: Rc<RefCell<FileReader>>,
+    file_reader: FileReader,
+    theme: Theme,
+    _on_load_file: Closure<dyn Fn()>,
 }
 
 impl Component for App {
     type Message = AppMessage;
     type Properties = ();
 
-    fn create(_ctx: &Context<Self>) -> Self {
+    fn create(ctx: &Context<Self>) -> Self {
         let app_state = Rc::new(RefCell::new(AppState::Idle));
-        let theme = Rc::new(RefCell::new(
-            get_stored_theme()
-                .expect("Unable to get theme")
-                .unwrap_or(Theme::Light),
-        ));
+        let theme = get_stored_theme()
+            .expect("Unable to get theme")
+            .unwrap_or(Theme::Light);
 
-        let file_reader = Rc::new(RefCell::new(
-            FileReader::new().expect("Unable to create file reader"),
-        ));
+        let file_reader = FileReader::new().expect("Unable to create file reader");
 
-        let on_load_file = Rc::new(RefCell::new({
+        let on_load_file = {
             let file_reader = file_reader.clone();
-            let app_state = app_state.clone();
+            let cb = ctx
+                .link()
+                .callback(|data: Vec<u8>| AppMessage::FileLoaded(data));
+
             Closure::<dyn Fn()>::wrap(Box::new(move || {
-                let data = file_reader.borrow_mut().result().unwrap();
+                let data = file_reader.result().unwrap();
                 let data: &web_sys::js_sys::ArrayBuffer = data.unchecked_ref();
                 let data = web_sys::js_sys::Uint8Array::new(data);
                 let data = data.to_vec();
-                *app_state.borrow_mut() = AppState::GameSelected { data };
+                cb.emit(data);
             }))
-        }));
+        };
 
-        // let app_state = app_state.clone();
-        // Callback::from(move |e: InputEvent| {
-        //     e.prevent_default();
-
-        //     let target = e.target().unwrap();
-        //     let input_ref = target.unchecked_ref::<web_sys::HtmlInputElement>();
-
-        //     if let Some(files) = input_ref.files() {
-        //         app_state.set(crate::app::AppState::Idle);
-        //         let file = files.item(0);
-        //         file_reader.set_onload(Some(onload_file.as_ref().unchecked_ref()));
-        //         file_reader
-        //             .read_as_array_buffer(file.as_ref().unwrap())
-        //             .unwrap();
-        //     }
-        // })
+        file_reader.set_onload(Some(on_load_file.as_ref().unchecked_ref()));
 
         Self {
             app_state,
-            theme,
-            on_load_file,
-
             file_reader,
+            theme,
+            _on_load_file: on_load_file,
         }
     }
 
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            AppMessage::ToggleTheme => {
+                let new_theme = self.theme.opposite();
+                self.theme = new_theme;
+                store_theme(new_theme).expect("Unable to save theme");
+            }
+            AppMessage::OpenEvent(input_ref) => {
+                if let Some(files) = input_ref.files() {
+                    *self.app_state.borrow_mut() = AppState::Idle;
+
+                    let file = files.item(0);
+                    self.file_reader
+                        .read_as_array_buffer(file.as_ref().unwrap())
+                        .unwrap();
+                }
+            }
+            AppMessage::FileLoaded(data) => {
+                *self.app_state.borrow_mut() = AppState::GameSelected { data };
+            }
+        };
         true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let is_idle = *self.app_state.borrow() == AppState::Idle;
 
-        let toggle_dark_mode = {
-            let theme = self.theme.clone();
-            Callback::from(move |e: MouseEvent| {
-                e.prevent_default();
-                let new_theme = theme.borrow().opposite();
-                *theme.borrow_mut() = new_theme;
-                store_theme(new_theme).expect("Unable to save theme");
-            })
-        };
+        let toggle_dark_mode = ctx.link().callback(|e: MouseEvent| {
+            e.prevent_default();
+            AppMessage::ToggleTheme
+        });
 
-        let open_file = {
-            let app_state = self.app_state.clone();
-            let file_reader = self.file_reader.clone();
-            let on_load_file = self.on_load_file.clone();
-            Callback::from(move |e: InputEvent| {
-                e.prevent_default();
-
-                let target = e.target().unwrap();
-                let input_ref = target.unchecked_ref::<web_sys::HtmlInputElement>();
-
-                if let Some(files) = input_ref.files() {
-                    *app_state.borrow_mut() = AppState::Idle;
-                    let file = files.item(0);
-                    let file_reader = file_reader.borrow_mut();
-                    file_reader.set_onload(Some(on_load_file.borrow().as_ref().unchecked_ref()));
-                    file_reader
-                        .read_as_array_buffer(file.as_ref().unwrap())
-                        .unwrap();
-                }
-            })
-        };
+        let emit_open_event = ctx.link().callback(|e: InputEvent| {
+            e.prevent_default();
+            let target = e.target().unwrap();
+            let input_ref = target.unchecked_ref::<web_sys::HtmlInputElement>();
+            AppMessage::OpenEvent(input_ref.clone())
+        });
 
         html! {
-            <body data-bs-theme={<Theme as Into<&str>>::into(*self.theme.borrow())} style="height: 100%">
-                <Header toggle_dark_mode={toggle_dark_mode} theme={*self.theme.borrow()} open_file={open_file} />
+            <body data-bs-theme={<Theme as Into<&str>>::into(self.theme)} style="height: 100%">
+                <Header toggle_dark_mode={toggle_dark_mode} theme={self.theme} open_file={emit_open_event} />
 
                 <div class="container">
-                    if is_idle {
-                        // <Loader game_data={file_data}>
-                        // </Loader>
-                    } else {
+                    if !is_idle {
                         <Game app_state={self.app_state.clone()}>
                         </Game>
                     }
@@ -135,72 +120,3 @@ impl Component for App {
         }
     }
 }
-
-// #[function_component(App)]
-// pub(super) fn app() -> Html {
-//     let app_state = use_state(|| AppState::Idle);
-
-//     let theme = use_state(|| {
-//         get_stored_theme()
-//             .expect("Unable to get theme")
-//             .unwrap_or(Theme::Light)
-//     });
-
-//     let toggle_dark_mode = {
-//         let theme = theme.clone();
-//         Callback::from(move |e: MouseEvent| {
-//             e.prevent_default();
-//             let new_theme = theme.opposite();
-//             theme.set(new_theme);
-//             store_theme(new_theme).expect("Unable to save theme");
-//         })
-//     };
-
-//     let open_file = {
-//         let file_reader = web_sys::FileReader::new().unwrap();
-//         let onload_file = use_state(|| {
-//             let file_reader = file_reader.clone();
-//             let app_state = app_state.clone();
-//             Closure::<dyn Fn()>::wrap(Box::new(move || {
-//                 let data = file_reader.result().unwrap();
-//                 let data: &web_sys::js_sys::ArrayBuffer = data.unchecked_ref();
-//                 let data = web_sys::js_sys::Uint8Array::new(data);
-//                 let data = data.to_vec();
-//                 app_state.set(AppState::GameSelected { data });
-//             }))
-//         });
-
-//         let app_state = app_state.clone();
-//         Callback::from(move |e: InputEvent| {
-//             e.prevent_default();
-
-//             let target = e.target().unwrap();
-//             let input_ref = target.unchecked_ref::<web_sys::HtmlInputElement>();
-
-//             if let Some(files) = input_ref.files() {
-//                 app_state.set(crate::app::AppState::Idle);
-//                 let file = files.item(0);
-//                 file_reader.set_onload(Some(onload_file.as_ref().unchecked_ref()));
-//                 file_reader
-//                     .read_as_array_buffer(file.as_ref().unwrap())
-//                     .unwrap();
-//             }
-//         })
-//     };
-
-//     html! {
-//         <body data-bs-theme={<Theme as Into<&str>>::into(*theme)} style="height: 100%">
-//             <Header toggle_dark_mode={toggle_dark_mode} theme={*theme} open_file={open_file} />
-
-//             <div class="container">
-//                 if *app_state == AppState::Idle {
-//                     // <Loader game_data={file_data}>
-//                     // </Loader>
-//                 } else {
-//                     <Game app_state={app_state}>
-//                     </Game>
-//                 }
-//             </div>
-//         </body>
-//     }
-// }
