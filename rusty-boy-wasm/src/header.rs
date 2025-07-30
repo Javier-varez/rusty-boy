@@ -8,10 +8,14 @@ pub struct HeaderProps {
     pub toggle_dark_mode: Callback<MouseEvent>,
     pub theme: Theme,
     pub open_file: Callback<InputEvent>,
+    pub close_file: Option<Callback<MouseEvent>>,
 }
 
 #[function_component(Header)]
 pub fn header(props: &HeaderProps) -> Html {
+    let close_active = props.close_file.is_some();
+    let close_callback = props.close_file.clone();
+
     html! {
         <div class="container">
             <head class="d-flex flex-wrap justify-content-center py-3 mb-4 border-bottom">
@@ -30,10 +34,11 @@ pub fn header(props: &HeaderProps) -> Html {
                                     <label class="dropdown-item" for="rom-selector">{"Open file"}</label>
                                     <input style="display: none" type="file" id="rom-selector" oninput={&props.open_file}/>
                                 </li>
-                                <li><a class="dropdown-item" href="#">{"Close"}</a></li>
+                                <li>
+                                    <button class="dropdown-item" onclick={close_callback} disabled={!close_active}>{"Close"}</button>
+                                </li>
                             </ul>
                         </div>
-                        // <button class="nav-link">{"Home"}</button>
                     </li>
                     <li class="nav-item"><button class="nav-link">{"Reset"}</button></li>
                     <li class="nav-item"><button class="nav-link">{"Help"}</button></li>

@@ -20,6 +20,7 @@ pub enum AppState {
 pub enum AppMessage {
     ToggleTheme,
     OpenEvent(HtmlInputElement),
+    CloseEvent,
     FileLoaded(Vec<u8>),
 }
 
@@ -87,6 +88,9 @@ impl Component for App {
             AppMessage::FileLoaded(data) => {
                 *self.app_state.borrow_mut() = AppState::GameSelected { data };
             }
+            AppMessage::CloseEvent => {
+                *self.app_state.borrow_mut() = AppState::Idle;
+            }
         };
         true
     }
@@ -106,9 +110,12 @@ impl Component for App {
             AppMessage::OpenEvent(input_ref.clone())
         });
 
+        let emit_close_event =
+            (!is_idle).then_some(ctx.link().callback(|_| AppMessage::CloseEvent));
+
         html! {
             <body data-bs-theme={<Theme as Into<&str>>::into(self.theme)} style="height: 100%">
-                <Header toggle_dark_mode={toggle_dark_mode} theme={self.theme} open_file={emit_open_event} />
+                <Header toggle_dark_mode={toggle_dark_mode} theme={self.theme} open_file={emit_open_event} close_file={emit_close_event}/>
 
                 <div class="container">
                     if !is_idle {
