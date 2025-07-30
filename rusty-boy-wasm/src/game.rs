@@ -16,9 +16,10 @@ pub struct Game {
     canvas: NodeRef,
     rusty_boy: RustyBoy,
     joypad_state: rusty_boy::joypad::State,
-    tick_closure: Closure<dyn Fn()>,
+    _tick_closure: Closure<dyn Fn()>,
     keyboard_closure: Closure<dyn Fn(KeyboardEvent)>,
     game_name: String,
+    interval_handle: i32,
 }
 
 pub enum GameMessage {
@@ -47,11 +48,14 @@ impl Component for Game {
     type Properties = GameProps;
 
     fn create(ctx: &Context<Self>) -> Self {
-        let AppState::GameSelected { data } = &*ctx.props().app_state.borrow() else {
-            panic!("Invalid state to construct a game!");
+        let data = {
+            let AppState::GameSelected { data } = &*ctx.props().app_state.borrow() else {
+                panic!("Invalid state to construct a game!");
+            };
+            data.clone()
         };
 
-        let cartridge = Cartridge::try_new(data.clone())
+        let cartridge = Cartridge::try_new(data)
             .map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))
             .unwrap();
         let title = cartridge.header().title.to_string();
@@ -72,14 +76,25 @@ impl Component for Game {
             Closure::<dyn Fn(KeyboardEvent)>::wrap(Box::new(move |e| cb.emit(e)))
         };
 
+        let interval_handle = {
+            let window = web_sys::window().unwrap();
+            window
+                .set_interval_with_callback_and_timeout_and_arguments_0(
+                    tick_closure.as_ref().unchecked_ref(),
+                    1000 / 60,
+                )
+                .unwrap()
+        };
+
         *ctx.props().app_state.borrow_mut() = AppState::Running;
         Self {
             canvas: NodeRef::default(),
             rusty_boy,
             joypad_state: Default::default(),
-            tick_closure,
+            _tick_closure: tick_closure,
             keyboard_closure,
             game_name: title,
+            interval_handle,
         }
     }
 
@@ -93,13 +108,6 @@ impl Component for Game {
                 canvas.set_height(ppu::DISPLAY_HEIGHT as u32);
 
                 let window = web_sys::window().unwrap();
-                window
-                    .set_interval_with_callback_and_timeout_and_arguments_0(
-                        self.tick_closure.as_ref().unchecked_ref(),
-                        1000 / 60,
-                    )
-                    .unwrap();
-
                 let document = window.document().unwrap();
                 document
                     .add_event_listener_with_callback(
@@ -171,5 +179,25 @@ impl Component for Game {
                 </div>
             </div>
         }
+    }
+}
+
+impl Drop for Game {
+    fn drop(&mut self) {
+        let window = web_sys::window().expect("Unable to get window");
+        window.clear_interval_with_handle(self.interval_handle);
+        let document = window.document().expect("Unable to get document");
+        document
+            .remove_event_listener_with_callback(
+                "keydown",
+                self.keyboard_closure.as_ref().unchecked_ref(),
+            )
+            .unwrap();
+        document
+            .remove_event_listener_with_callback(
+                "keyup",
+                self.keyboard_closure.as_ref().unchecked_ref(),
+            )
+            .unwrap();
     }
 }
