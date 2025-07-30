@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use wasm_bindgen::{JsCast, prelude::Closure};
 use web_sys::CanvasRenderingContext2d;
 use web_sys::ImageData;
@@ -7,7 +10,7 @@ use yew::prelude::*;
 use cartridge::Cartridge;
 use rusty_boy::RustyBoy;
 
-use crate::app::Props;
+use crate::app::AppState;
 
 pub struct Game {
     canvas: NodeRef,
@@ -34,12 +37,21 @@ fn to_color_array(color: ppu::Color) -> [u8; 4] {
     }
 }
 
+#[derive(Properties, PartialEq)]
+pub struct GameProps {
+    pub app_state: Rc<RefCell<AppState>>,
+}
+
 impl Component for Game {
     type Message = GameMessage;
-    type Properties = Props;
+    type Properties = GameProps;
 
     fn create(ctx: &Context<Self>) -> Self {
-        let cartridge = Cartridge::try_new(ctx.props().game_data.as_ref().unwrap().to_vec())
+        let AppState::GameSelected { data } = &*ctx.props().app_state.borrow() else {
+            panic!("Invalid state to construct a game!");
+        };
+
+        let cartridge = Cartridge::try_new(data.clone())
             .map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))
             .unwrap();
         let title = cartridge.header().title.to_string();
@@ -59,6 +71,8 @@ impl Component for Game {
                 .callback(|e: KeyboardEvent| GameMessage::KeyboardEvent(e));
             Closure::<dyn Fn(KeyboardEvent)>::wrap(Box::new(move |e| cb.emit(e)))
         };
+
+        *ctx.props().app_state.borrow_mut() = AppState::Running;
         Self {
             canvas: NodeRef::default(),
             rusty_boy,

@@ -1,10 +1,10 @@
 use yew::prelude::*;
 
-use crate::app::Theme;
+use crate::theme::Theme;
 
 #[derive(Properties, PartialEq)]
 pub struct ColorThemeIconProps {
-    pub theme: super::app::Theme,
+    pub theme: Theme,
 }
 
 #[function_component(ColorThemeIcon)]

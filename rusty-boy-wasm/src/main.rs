@@ -1,7 +1,9 @@
 mod app;
+mod error;
 mod game;
+mod header;
 mod icon;
-mod loader;
+mod theme;
 
 use app::App;
 
