@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use base64::Engine;
 use wasm_bindgen::{JsCast, prelude::Closure};
 use web_sys::CanvasRenderingContext2d;
 use web_sys::ImageData;
@@ -48,6 +49,7 @@ impl Component for Game {
     type Properties = GameProps;
 
     fn create(ctx: &Context<Self>) -> Self {
+        web_sys::console::log_1(&"Game created!".into());
         let data = {
             let AppState::GameSelected { data } = &*ctx.props().app_state.borrow() else {
                 panic!("Invalid state to construct a game!");
@@ -90,7 +92,7 @@ impl Component for Game {
         }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             GameMessage::Init => {
                 let Some(canvas): Option<web_sys::HtmlCanvasElement> = self.canvas.cast() else {
@@ -103,6 +105,18 @@ impl Component for Game {
                 self.rusty_boy.update_keys(&joypad_state);
             }
             GameMessage::Tick => {
+                if matches!(*ctx.props().app_state.borrow(), AppState::LoadingState) {
+                    // TODO(ja):
+                    self.load_state().unwrap();
+                    web_sys::console::log_1(&"load success".into());
+                }
+                if matches!(*ctx.props().app_state.borrow(), AppState::SavingState) {
+                    // TODO(ja):
+                    self.save_state().unwrap();
+                    web_sys::console::log_1(&"save success".into());
+                }
+                *ctx.props().app_state.borrow_mut() = AppState::Running;
+
                 let frame = self.rusty_boy.run_until_next_frame(true);
 
                 let Some(canvas): Option<web_sys::HtmlCanvasElement> = self.canvas.cast() else {
@@ -134,6 +148,7 @@ impl Component for Game {
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
+        web_sys::console::log_1(&"redraw".into());
         html! {
             <div class="d-flex justify-content-center card">
                 <div class="card-header">
@@ -144,6 +159,70 @@ impl Component for Game {
                 </div>
             </div>
         }
+    }
+}
+
+impl Game {
+    pub fn load_state(&mut self) -> crate::error::Result<()> {
+        let local_storage = web_sys::window()
+            .ok_or_else(|| crate::error::Error::AppError(Some("window is not valid".to_string())))?
+            .local_storage()?
+            .ok_or_else(|| {
+                crate::error::Error::AppError(Some("local storage is not valid".to_string()))
+            })?;
+
+        let game_name = &self.game_name;
+        let Some(savestate) = local_storage.get_item(&format!("game_savestate:{game_name}"))?
+        else {
+            web_sys::console::log_1(&"No save states available".into());
+            return Ok(());
+        };
+
+        web_sys::console::log_1(&"Loading save state".into());
+
+        if !self.rusty_boy.supports_battery_backed_ram() {
+            return Ok(());
+        }
+
+        let engine = base64::engine::general_purpose::URL_SAFE;
+        let ram = engine.decode(savestate).map_err(|e| {
+            crate::error::Error::AppError(Some(format!("savestate is invalid base64 data: {e:?}")))
+        })?;
+
+        self.rusty_boy.reset();
+        self.rusty_boy
+            .restore_cartridge_ram(&ram[..])
+            .map_err(|e| {
+                crate::error::Error::AppError(Some(format!("Error restoring ram: {e:?}")))
+            })?;
+
+        Ok(())
+    }
+
+    pub fn save_state(&mut self) -> crate::error::Result<()> {
+        let local_storage = web_sys::window()
+            .ok_or_else(|| crate::error::Error::AppError(Some("window is not valid".to_string())))?
+            .local_storage()?
+            .ok_or_else(|| {
+                crate::error::Error::AppError(Some("local storage is not valid".to_string()))
+            })?;
+
+        if !self.rusty_boy.supports_battery_backed_ram() {
+            return Ok(());
+        }
+
+        let Some(ram) = self.rusty_boy.get_cartridge_ram() else {
+            return Ok(());
+        };
+
+        let engine = base64::engine::general_purpose::URL_SAFE;
+        let savedata = engine.encode(ram);
+
+        let game_name = &self.game_name;
+        web_sys::console::log_1(&format!("Saving state for game {game_name}").into());
+        local_storage.set_item(&format!("game_savestate:{game_name}"), &savedata)?;
+
+        Ok(())
     }
 }
 

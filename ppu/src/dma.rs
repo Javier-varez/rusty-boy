@@ -32,6 +32,12 @@ impl DmaEngine {
         self.active = true;
     }
 
+    pub fn reset(&mut self) {
+        self.active = false;
+        self.base_address = 0;
+        self.current_element = 0;
+    }
+
     pub fn run<T: Memory>(&mut self, mut cycles: Cycles, memory: &mut T) {
         const NO_CYCLES: Cycles = Cycles::new(0);
         while cycles != NO_CYCLES && self.active {

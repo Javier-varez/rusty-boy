@@ -465,6 +465,12 @@ impl Cpu {
     }
 
     /// Queries the registers of the CPU
+    pub fn reset(&mut self) {
+        self.regs = Registers::new();
+        self.halted = false;
+    }
+
+    /// Queries the registers of the CPU
     pub const fn get_regs(&self) -> &Registers {
         &self.regs
     }
