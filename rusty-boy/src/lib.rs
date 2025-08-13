@@ -38,6 +38,16 @@ impl RustyBoy {
         self.debug = true;
     }
 
+    pub fn reset(&mut self) {
+        self.cpu.reset();
+
+        const ENTRYPOINT: u16 = 0x100;
+        self.cpu.get_mut_regs().pc_reg = ENTRYPOINT;
+
+        self.dma_engine.reset();
+        self.address_space.reset();
+    }
+
     /// Configures the number of cycles that the CPU runs before updating other peripherals.
     /// This makes the emulation less accurate, so be careful when using it, as it introduces
     /// jitter in operations around the CPU and reduces cycle accuracy.

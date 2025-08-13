@@ -10,6 +10,8 @@ pub struct HeaderProps {
     pub theme: Theme,
     pub open_file: Callback<InputEvent>,
     pub close_file: Option<Callback<MouseEvent>>,
+    pub save_state: Option<Callback<MouseEvent>>,
+    pub load_state: Option<Callback<MouseEvent>>,
 }
 
 #[function_component(Header)]
@@ -32,6 +34,16 @@ pub fn header(props: &HeaderProps) -> Html {
                                     <li>
                                         <label class="dropdown-item" for="rom-selector">{"Open file"}</label>
                                         <input style="display: none" type="file" id="rom-selector" oninput={&props.open_file}/>
+                                    </li>
+                                    <li>
+                                        <button class="dropdown-item" onclick={props.save_state.clone()} disabled={props.save_state.is_none()}>
+                                            {"Save state"}
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button class="dropdown-item" onclick={props.load_state.clone()} disabled={props.load_state.is_none()}>
+                                            {"Load state"}
+                                        </button>
                                     </li>
                                     <li>
                                         <button class="dropdown-item" onclick={props.close_file.clone()} disabled={props.close_file.is_none()}>
