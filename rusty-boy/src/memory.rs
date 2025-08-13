@@ -1,4 +1,4 @@
-use crate::joypad::Joypad;
+use crate::joypad::{self, Joypad};
 use cartridge::Cartridge;
 use ppu::Ppu;
 use sm83::interrupts::InterruptRegs;
@@ -53,6 +53,21 @@ impl GbAddressSpace {
             sb: 0,
             sc: 0,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.ppu = Ppu::new();
+        for elem in self.wram.iter_mut() {
+            *elem = 0;
+        }
+        for elem in self.hram.iter_mut() {
+            *elem = 0;
+        }
+        self.interrupt_regs = InterruptRegs::new();
+        self.joypad = Joypad::new();
+        self.timer = Timer::new();
+        self.sb = 0;
+        self.sc = 0;
     }
 }
 
