@@ -184,7 +184,7 @@ impl Game {
             return Ok(());
         }
 
-        let engine = base64::engine::general_purpose::URL_SAFE;
+        let engine = base64::engine::general_purpose::STANDARD;
         let ram = engine.decode(savestate).map_err(|e| {
             crate::error::Error::AppError(Some(format!("savestate is invalid base64 data: {e:?}")))
         })?;
@@ -215,7 +215,7 @@ impl Game {
             return Ok(());
         };
 
-        let engine = base64::engine::general_purpose::URL_SAFE;
+        let engine = base64::engine::general_purpose::STANDARD;
         let savedata = engine.encode(ram);
 
         let game_name = &self.game_name;
