@@ -2042,6 +2042,7 @@ dependencies = [
  "plist",
  "rustc-demangle",
  "serde",
+ "serde_json",
  "serialport",
  "termcolor",
  "xshell",

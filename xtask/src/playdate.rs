@@ -18,7 +18,12 @@ fn find_port() -> Result<Option<SerialPortInfo>> {
 
 fn open_port() -> Result<Box<dyn SerialPort>> {
     let port = find_port()?.expect("Could not find Playdate serial port!");
-    Ok(serialport::new(&port.port_name, 115200).open()?)
+    Ok(serialport::new(&port.port_name, 115200)
+        .flow_control(serialport::FlowControl::None)
+        .data_bits(serialport::DataBits::Eight)
+        .stop_bits(serialport::StopBits::One)
+        .parity(serialport::Parity::None)
+        .open()?)
 }
 
 pub struct Playdate {
@@ -47,6 +52,7 @@ impl Playdate {
             .ok_or(anyhow::anyhow!("Playdate serial is not available"))?;
 
         pd.write_all(command)?;
+        pd.flush()?;
         pd.write_all(b"\r\n")?;
         pd.flush()?;
 

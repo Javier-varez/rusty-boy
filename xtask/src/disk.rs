@@ -5,8 +5,11 @@ use std::path::PathBuf;
 mod linux;
 
 #[cfg(target_os = "linux")]
+use linux::*;
+
+#[cfg(target_os = "linux")]
 pub fn find_playdate_data_disk() -> Result<Option<(String, PathBuf)>> {
-    todo!()
+    lookup_disk_by_mountpoint("PLAYDATE")
 }
 
 #[cfg(target_os = "linux")]
