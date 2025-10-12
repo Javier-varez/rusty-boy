@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     naersk.url = "github:nix-community/naersk/master";
     utils.url = "github:numtide/flake-utils";
     playdate-sdk.url = "github:RegularTetragon/playdate-sdk-flake";
@@ -43,7 +43,7 @@
                 gnumake
                 udev
                 trunk
-                wasm-bindgen-cli
+                wasm-bindgen-cli_0_2_104
                 dart-sass
               ]
               ++ (lib.optionals stdenv.isLinux [

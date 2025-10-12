@@ -17,6 +17,7 @@ cartridge.workspace = true
 ppu.workspace = true
 rusty-boy.workspace = true
 sm83.workspace = true
-wasm-bindgen = "0.2.100"
+# We pin wasm bindgen because its version needs to match the one in the flake
+wasm-bindgen = "=0.2.104"
 web-sys = { version = "0.3.77", features = ["HtmlCanvasElement", "CanvasRenderingContext2d", "ImageData"] }
 yew = { version = "0.21", features = ["csr"] }
