@@ -19,6 +19,7 @@ jobs:
       with:
         toolchain: 1.88.0
         components: rustfmt, clippy, rust-src
+    - run: sudo apt-get update
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo clippy
 
@@ -31,6 +32,7 @@ jobs:
       with:
         toolchain: 1.88.0
         components: rustfmt, clippy, rust-src
+    - run: sudo apt-get update
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo test
 
@@ -46,6 +48,7 @@ jobs:
         components: rustfmt, clippy, rust-src
     - run: rustup toolchain install 1.88.0
     - run: rustup target add wasm32-unknown-unknown --toolchain 1.88.0
+    - run: sudo apt-get update
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo install trunk
     - run: |
@@ -67,6 +70,7 @@ jobs:
       with:
         toolchain: 1.88.0
         components: rustfmt, clippy, rust-src
+    - run: sudo apt-get update
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo fmt --check
 
@@ -79,6 +83,7 @@ jobs:
       with:
         toolchain: 1.88.0
         components: rustfmt, clippy, rust-src
+    - run: sudo apt-get update
     - run: sudo apt-get install libsdl2-dev libudev-dev
     - run: cargo doc
 
