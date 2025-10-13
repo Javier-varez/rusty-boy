@@ -60,7 +60,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "crankstart"
 version = "0.1.2"
-source = "git+https://github.com/javier-varez/crankstart#56ac898df2ed59b45db99019ad10b45e67699237"
+source = "git+https://github.com/javier-varez/crankstart#3cdbe6facca0c2826852b690129772f19a86f7fa"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -73,7 +73,7 @@ dependencies = [
 [[package]]
 name = "crankstart-sys"
 version = "0.1.2"
-source = "git+https://github.com/javier-varez/crankstart#56ac898df2ed59b45db99019ad10b45e67699237"
+source = "git+https://github.com/javier-varez/crankstart#3cdbe6facca0c2826852b690129772f19a86f7fa"
 dependencies = [
  "euclid",
 ]
