@@ -54,14 +54,11 @@ impl GameSelector {
         let file = fs.open("readme.txt", crankstart_sys::FileOptions::kFileWrite)?;
         file.write("Put roms here".as_bytes())?;
 
-        let mut choices = vec![];
-        choices.shrink_to(0);
-        for file in fs.listfiles("", false)? {
-            if !file.ends_with(".gb") {
-                continue;
-            }
-            choices.push(file);
-        }
+        let choices: Vec<_> = fs
+            .listfiles("", false)?
+            .into_iter()
+            .filter(|file| file.ends_with(".gb"))
+            .collect();
 
         let selector = Self { index: 0, choices };
         selector.draw_picker(font)?;
