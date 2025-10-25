@@ -464,7 +464,7 @@ impl Cpu {
         }
     }
 
-    /// Queries the registers of the CPU
+    /// Resets the CPU
     pub fn reset(&mut self) {
         self.regs = Registers::new();
         self.halted = false;
