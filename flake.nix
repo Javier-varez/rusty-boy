@@ -36,6 +36,7 @@
           mkShell {
             buildInputs =
               [
+                gcc
                 pkg-config
                 SDL2
                 gcc-arm-embedded-13

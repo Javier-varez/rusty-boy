@@ -179,7 +179,7 @@ pub enum Error {
     /// The cartridge does not contain a header
     NoHeader,
     /// The cartridge contains a header with an invalid title
-    InvalidTitle,
+    InvalidTitle(alloc::vec::Vec<u8>),
     /// The cartridge contains a header with an invalid RAM size
     InvalidRamSize,
 }
@@ -220,10 +220,17 @@ impl<'a> CartridgeHeader<'a> {
             return Err(Error::NoHeader);
         }
 
+        // This flag is set in certain game titles to indicate the game is compatible with color
+        // game boy. It is not part of the title.
+        const CGB_FLAG: u8 = 0x80;
+
         let title = &data[0x134..0x144];
-        let title_length = title.iter().take_while(|b| **b != 0).count();
+        let title_length = title
+            .iter()
+            .take_while(|b| **b != 0 && **b != CGB_FLAG)
+            .count();
         let title = &title[..title_length];
-        let title = core::str::from_utf8(title).map_err(|_| Error::InvalidTitle)?;
+        let title = core::str::from_utf8(title).map_err(|_| Error::InvalidTitle(title.to_vec()))?;
 
         let manufacturer_code = if title.len() > 11 {
             None
