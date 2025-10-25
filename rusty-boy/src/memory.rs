@@ -1,4 +1,4 @@
-use crate::joypad::{self, Joypad};
+use crate::joypad::Joypad;
 use cartridge::Cartridge;
 use ppu::Ppu;
 use sm83::interrupts::InterruptRegs;
@@ -77,6 +77,10 @@ impl sm83::memory::Memory for GbAddressSpace {
             0x0000..=0x7FFF | 0xA000..=0xBFFF => self.cartridge.read(address),
             0xC000..=0xDFFF => self.wram[address as usize - 0xC000],
             0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80],
+            0xE000..=0xFDFF => {
+                // This region must not be used (according to nintendo), but unfortunately some games seem to rely on it.
+                self.wram[address as usize - 0xE000]
+            }
             0x8000..=0x9FFF | 0xFE00..=0xFE9F | 0xFF40..=0xFF4B => self.ppu.read(address),
             0xFF00 => self.joypad.read(address),
             0xFF01 => self.sb,
@@ -91,7 +95,6 @@ impl sm83::memory::Memory for GbAddressSpace {
                 // This region must not be used, but unfortunately some games seem to rely on it.
                 0
             }
-            _ => panic!("Invalid read address: {}", address),
         }
     }
 
@@ -103,6 +106,10 @@ impl sm83::memory::Memory for GbAddressSpace {
             }
             0xFF80..=0xFFFE => {
                 self.hram[address as usize - 0xFF80] = value;
+            }
+            0xE000..=0xFDFF => {
+                // This region must not be used (according to nintendo), but unfortunately some games seem to rely on it.
+                self.wram[address as usize - 0xE000] = value;
             }
             0x8000..=0x9FFF | 0xFE00..=0xFE9F | 0xFF40..=0xFF4B => self.ppu.write(address, value),
             0xFF00 => self.joypad.write(address, value),
@@ -119,7 +126,6 @@ impl sm83::memory::Memory for GbAddressSpace {
             0xFEA0..=0xFEFF => {
                 // This region must not be used, but unfortunately some games seem to rely on it.
             }
-            _ => panic!("Invalid write address: {address:#x}, value {value:#x}"),
         }
     }
 }
