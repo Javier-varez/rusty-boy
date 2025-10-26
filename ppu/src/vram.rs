@@ -178,6 +178,9 @@ impl TileIndex {
     pub fn next(self) -> Self {
         Self(self.0 + 1)
     }
+    pub fn discard_bit_zero(self) -> Self {
+        Self(self.0 & 0xfe)
+    }
 }
 
 impl From<u8> for TileIndex {
