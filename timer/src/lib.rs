@@ -44,6 +44,11 @@ static_assertions::const_assert_eq!(NUM_CYCLES_PER_DIV_TICK, 256);
 const HIDDEN_BITS: u32 = NUM_CYCLES_PER_DIV_TICK.trailing_zeros();
 static_assertions::const_assert_eq!(HIDDEN_BITS, 8);
 
+const TAC_ADDR: sm83::memory::Address = 0xff07;
+const TMA_ADDR: sm83::memory::Address = 0xff06;
+const TIMA_ADDR: sm83::memory::Address = 0xff05;
+const DIV_ADDR: sm83::memory::Address = 0xff04;
+
 impl Default for Timer {
     fn default() -> Self {
         Self::new()
@@ -74,6 +79,7 @@ impl Timer {
         }
     }
 
+    #[must_use]
     pub fn step(&mut self, cycles: Cycles) -> Interrupts {
         // TODO: do not run timer if cpu is disabled
 
@@ -108,7 +114,11 @@ impl Timer {
             shifted_cur_div - shifted_prev_div
         };
 
-        let (new_tima, did_tima_overflow) = self.tima.overflowing_add(new_count as u8);
+        let (mut new_tima, did_tima_overflow) = self.tima.overflowing_add(new_count as u8);
+        if did_tima_overflow {
+            new_tima = self.tma;
+        }
+
         self.tima = new_tima;
         if did_tima_overflow {
             Interrupt::Timer.into()
@@ -119,24 +129,223 @@ impl Timer {
 
     pub fn read(&self, address: sm83::memory::Address) -> u8 {
         match address {
-            0xFF04 => (self.div >> HIDDEN_BITS) as u8,
-            0xFF05 => self.tima,
-            0xFF06 => self.tma,
-            0xFF07 => self.tac.get(),
+            DIV_ADDR => (self.div >> HIDDEN_BITS) as u8,
+            TIMA_ADDR => self.tima,
+            TMA_ADDR => self.tma,
+            TAC_ADDR => self.tac.get(),
             _ => unreachable!("Unexpected timer read from {:#x}", address),
         }
     }
 
     pub fn write(&mut self, address: sm83::memory::Address, value: u8) {
         match address {
-            0xFF04 => self.request_div_reset = true,
-            0xFF05 => self.tima = value,
-            0xFF06 => self.tma = value,
-            0xFF07 => self.tac.set(value),
+            DIV_ADDR => self.request_div_reset = true,
+            TIMA_ADDR => self.tima = value,
+            TMA_ADDR => self.tma = value,
+            TAC_ADDR => self.tac.set(value),
             _ => unreachable!(
                 "Unexpected timer write to {:#x}, value {:#x}",
                 address, value
             ),
         };
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+    use tock_registers::interfaces::Readable;
+
+    #[test]
+    fn construct_timer() {
+        let timer = Timer::new();
+        assert_eq!(timer.div, 0);
+        assert_eq!(timer.tima, 0);
+        assert_eq!(timer.tma, 0);
+        assert_eq!(timer.tac.get(), 0);
+
+        let enabled: TAC::ENABLE::Value = timer.tac.read_as_enum(TAC::ENABLE).unwrap();
+        assert_eq!(enabled, TAC::ENABLE::Value::Off);
+    }
+
+    #[test]
+    fn timer_config_64() {
+        let mut timer = Timer::new();
+        // Write enable reg
+        timer.write(TAC_ADDR, 7);
+
+        let enabled: TAC::ENABLE::Value = timer.tac.read_as_enum(TAC::ENABLE).unwrap();
+        assert_eq!(enabled, TAC::ENABLE::Value::On);
+
+        let clk: TAC::CLK_SELECT::Value = timer.tac.read_as_enum(TAC::CLK_SELECT).unwrap();
+        assert_eq!(clk, TAC::CLK_SELECT::Value::MCycles64);
+
+        for i in 0usize..255 {
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, (i & 0xff) as u8);
+
+            assert_eq!(timer.step(Cycles::new(64 * 4)), Interrupts::new());
+
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, ((i + 1) & 0xff) as u8);
+        }
+
+        {
+            assert_eq!(timer.step(Cycles::new(64 * 4)), Interrupt::Timer.into());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 0);
+        }
+
+        {
+            assert_eq!(timer.step(Cycles::new(64 * 4)), Interrupts::new());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 1);
+        }
+    }
+
+    #[test]
+    fn timer_config_4() {
+        let mut timer = Timer::new();
+        // Write enable reg
+        timer.write(TAC_ADDR, 5);
+
+        let enabled: TAC::ENABLE::Value = timer.tac.read_as_enum(TAC::ENABLE).unwrap();
+        assert_eq!(enabled, TAC::ENABLE::Value::On);
+
+        let clk: TAC::CLK_SELECT::Value = timer.tac.read_as_enum(TAC::CLK_SELECT).unwrap();
+        assert_eq!(clk, TAC::CLK_SELECT::Value::MCycles4);
+
+        const CYCLES: Cycles = Cycles::new(4 * 4);
+        for i in 0usize..255 {
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, (i & 0xff) as u8);
+
+            assert_eq!(timer.step(CYCLES), Interrupts::new());
+
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, ((i + 1) & 0xff) as u8);
+        }
+
+        {
+            assert_eq!(timer.step(CYCLES), Interrupt::Timer.into());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 0);
+        }
+
+        {
+            assert_eq!(timer.step(CYCLES), Interrupts::new());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 1);
+        }
+    }
+
+    #[test]
+    fn timer_config_16() {
+        let mut timer = Timer::new();
+        // Write enable reg
+        timer.write(TAC_ADDR, 6);
+
+        let enabled: TAC::ENABLE::Value = timer.tac.read_as_enum(TAC::ENABLE).unwrap();
+        assert_eq!(enabled, TAC::ENABLE::Value::On);
+
+        let clk: TAC::CLK_SELECT::Value = timer.tac.read_as_enum(TAC::CLK_SELECT).unwrap();
+        assert_eq!(clk, TAC::CLK_SELECT::Value::MCycles16);
+
+        const CYCLES: Cycles = Cycles::new(4 * 16);
+        for i in 0usize..255 {
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, (i & 0xff) as u8);
+
+            assert_eq!(timer.step(CYCLES), Interrupts::new());
+
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, ((i + 1) & 0xff) as u8);
+        }
+
+        {
+            assert_eq!(timer.step(CYCLES), Interrupt::Timer.into());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 0);
+        }
+
+        {
+            assert_eq!(timer.step(CYCLES), Interrupts::new());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 1);
+        }
+    }
+
+    #[test]
+    fn timer_config_256() {
+        let mut timer = Timer::new();
+        // Write enable reg
+        timer.write(TAC_ADDR, 4);
+
+        let enabled: TAC::ENABLE::Value = timer.tac.read_as_enum(TAC::ENABLE).unwrap();
+        assert_eq!(enabled, TAC::ENABLE::Value::On);
+
+        let clk: TAC::CLK_SELECT::Value = timer.tac.read_as_enum(TAC::CLK_SELECT).unwrap();
+        assert_eq!(clk, TAC::CLK_SELECT::Value::MCycles256);
+
+        const CYCLES: Cycles = Cycles::new(256 * 4);
+        for i in 0usize..255 {
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, (i & 0xff) as u8);
+
+            assert_eq!(timer.step(CYCLES), Interrupts::new());
+
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, ((i + 1) & 0xff) as u8);
+        }
+
+        {
+            assert_eq!(timer.step(CYCLES), Interrupt::Timer.into());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 0);
+        }
+
+        {
+            assert_eq!(timer.step(CYCLES), Interrupts::new());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 1);
+        }
+    }
+
+    #[test]
+    fn reload_value() {
+        let mut timer = Timer::new();
+        // Write enable reg
+        timer.write(TMA_ADDR, 0x80); // reload value is 0x80
+        timer.write(TIMA_ADDR, 0x80); // initial value
+        timer.write(TAC_ADDR, 4);
+
+        let enabled: TAC::ENABLE::Value = timer.tac.read_as_enum(TAC::ENABLE).unwrap();
+        assert_eq!(enabled, TAC::ENABLE::Value::On);
+
+        let clk: TAC::CLK_SELECT::Value = timer.tac.read_as_enum(TAC::CLK_SELECT).unwrap();
+        assert_eq!(clk, TAC::CLK_SELECT::Value::MCycles256);
+
+        const CYCLES: Cycles = Cycles::new(256 * 4);
+        for i in 0usize..0x7f {
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, ((i + 0x80) & 0xff) as u8);
+
+            assert_eq!(timer.step(CYCLES), Interrupts::new());
+
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, ((i + 0x81) & 0xff) as u8);
+        }
+
+        {
+            assert_eq!(timer.step(CYCLES), Interrupt::Timer.into());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 0x80);
+        }
+
+        {
+            assert_eq!(timer.step(CYCLES), Interrupts::new());
+            let tima = timer.read(TIMA_ADDR);
+            assert_eq!(tima, 0x81);
+        }
     }
 }
