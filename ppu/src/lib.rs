@@ -362,12 +362,12 @@ impl Ppu {
 
         const WX_OFFSET: usize = 7;
         let wx = self.regs.wx as usize;
-        let disp_x_offset = if wx >= WX_OFFSET { wx - WX_OFFSET } else { 0 };
+        let disp_x_offset = wx.saturating_sub(WX_OFFSET);
         if disp_x_offset >= DISPLAY_WIDTH {
             return;
         }
 
-        let disp_x_initial_skip = if wx >= WX_OFFSET { 0 } else { WX_OFFSET - wx };
+        let disp_x_initial_skip = WX_OFFSET.saturating_sub(wx);
         let tile_line_idx = win_line % vram::TILE_HEIGHT;
 
         let window_pixels = self
@@ -395,6 +395,8 @@ impl Ppu {
         bg_line: &[PaletteIndex; DISPLAY_WIDTH],
         line: &mut [Option<(usize, Color)>; DISPLAY_WIDTH],
     ) {
+        let obj_height = (self.regs.lcdc.read(regs::LCDC::OBJ_SIZE) as usize + 1) * 8;
+
         for (obj_prio, object) in self
             .selected_oam_entries
             .iter()
@@ -405,17 +407,17 @@ impl Ppu {
             let x_flip = object.attrs.read(oam::OBJ_ATTRS::X_FLIP) != 0;
 
             let tile_line = OBJ_OFFSET_Y + self.line - object.y as usize;
+            debug_assert!(tile_line < obj_height);
+            let tile_line = if y_flip {
+                obj_height - 1 - tile_line
+            } else {
+                tile_line
+            };
+
             let (tile_idx, tile_line) = if tile_line >= TILE_HEIGHT {
                 (object.tile_idx.next(), tile_line - TILE_HEIGHT)
             } else {
                 (object.tile_idx, tile_line)
-            };
-
-            debug_assert!(tile_line < TILE_HEIGHT);
-            let tile_line = if y_flip {
-                TILE_HEIGHT - 1 - tile_line
-            } else {
-                tile_line
             };
 
             let palette = match object
