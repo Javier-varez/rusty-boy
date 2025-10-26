@@ -93,6 +93,7 @@ pub struct Ppu {
     line: usize,
 
     stat_irq: bool,
+    current_window_line: usize,
 
     // Vector of indexes into OAM entries
     selected_oam_entries: heapless::Vec<usize, MAX_SELECTED_OBJECTS>,
@@ -158,6 +159,7 @@ impl Ppu {
             line: 0,
 
             stat_irq: false,
+            current_window_line: 0,
             selected_oam_entries: heapless::Vec::new(),
             framebuffer: unsafe {
                 core::mem::transmute::<Box<UninitFrame>, Box<Frame>>(framebuffer)
@@ -270,6 +272,7 @@ impl Ppu {
                 self.draw_line();
             }
             Mode::Vblank => {
+                self.current_window_line = 0;
                 self.update_registers();
                 return (Interrupt::Vblank.into(), PpuResult::FrameComplete);
             }
@@ -335,7 +338,7 @@ impl Ppu {
     }
 
     #[cfg_attr(feature = "profile", inline(never))]
-    fn draw_line_window(&self, line: &mut [PaletteIndex; DISPLAY_WIDTH]) {
+    fn draw_line_window(&mut self, line: &mut [PaletteIndex; DISPLAY_WIDTH]) {
         let bg_win_enable = self.regs.lcdc.read(regs::LCDC::BG_AND_WINDOW_ENABLE) != 0;
         if !bg_win_enable {
             return;
@@ -346,7 +349,6 @@ impl Ppu {
             // Nothing to draw, return
             return;
         }
-        let win_line = self.line - wy;
 
         let win_tile_map: crate::regs::LCDC::WINDOW_TILE_MAP::Value = self
             .regs
@@ -360,20 +362,22 @@ impl Ppu {
             .read_as_enum(crate::regs::LCDC::BG_AND_WINDOW_TILE_DATA)
             .expect("Invalid LCDC bit 4");
 
-        const WX_OFFSET: usize = 7;
+        const WX_OFFSET: usize = 8;
         let wx = self.regs.wx as usize;
         let disp_x_offset = wx.saturating_sub(WX_OFFSET);
         if disp_x_offset >= DISPLAY_WIDTH {
             return;
         }
 
-        let disp_x_initial_skip = WX_OFFSET.saturating_sub(wx);
-        let tile_line_idx = win_line % vram::TILE_HEIGHT;
+        let current_window_line = self.current_window_line;
+        self.current_window_line += 1;
 
+        let disp_x_initial_skip = WX_OFFSET.saturating_sub(wx);
+        let tile_line_idx = current_window_line % vram::TILE_HEIGHT;
         let window_pixels = self
             .vram
             .get_win_tile_map(win_tile_map)
-            .line(win_line)
+            .line(current_window_line)
             .iter()
             .flat_map(|tile_idx| {
                 self.vram
