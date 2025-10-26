@@ -399,7 +399,9 @@ impl Ppu {
         bg_line: &[PaletteIndex; DISPLAY_WIDTH],
         line: &mut [Option<(usize, Color)>; DISPLAY_WIDTH],
     ) {
-        let obj_height = (self.regs.lcdc.read(regs::LCDC::OBJ_SIZE) as usize + 1) * 8;
+        let double_size_tiles: regs::LCDC::OBJ_SIZE::Value =
+            self.regs.lcdc.read_as_enum(regs::LCDC::OBJ_SIZE).unwrap();
+        let obj_height = (double_size_tiles as usize + 1) * 8;
 
         for (obj_prio, object) in self
             .selected_oam_entries
@@ -418,10 +420,17 @@ impl Ppu {
                 tile_line
             };
 
-            let (tile_idx, tile_line) = if tile_line >= TILE_HEIGHT {
-                (object.tile_idx.next(), tile_line - TILE_HEIGHT)
+            // In 8x16 mode, the tile index is always aligned to 2, enforced by the hardware.
+            let tile_idx = if double_size_tiles == regs::LCDC::OBJ_SIZE::Value::Tile8x16 {
+                object.tile_idx.discard_bit_zero()
             } else {
-                (object.tile_idx, tile_line)
+                object.tile_idx
+            };
+
+            let (tile_idx, tile_line) = if tile_line >= TILE_HEIGHT {
+                (tile_idx.next(), tile_line - TILE_HEIGHT)
+            } else {
+                (tile_idx, tile_line)
             };
 
             let palette = match object
