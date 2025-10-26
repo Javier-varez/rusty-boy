@@ -403,8 +403,13 @@ impl Ppu {
             self.regs.lcdc.read_as_enum(regs::LCDC::OBJ_SIZE).unwrap();
         let obj_height = (double_size_tiles as usize + 1) * 8;
 
-        for (obj_prio, object) in self
-            .selected_oam_entries
+        let objects = &self.oam.objects();
+        let mut oam_entries: heapless::Vec<usize, MAX_SELECTED_OBJECTS> =
+            self.selected_oam_entries.clone();
+        // OAM object priorities are based on the X coordinate.
+        oam_entries.sort_by_key(|i| objects[*i].x);
+
+        for (obj_prio, object) in oam_entries
             .iter()
             .map(|i| &self.oam.objects()[*i])
             .enumerate()
