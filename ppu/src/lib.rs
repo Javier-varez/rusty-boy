@@ -362,7 +362,7 @@ impl Ppu {
             .read_as_enum(crate::regs::LCDC::BG_AND_WINDOW_TILE_DATA)
             .expect("Invalid LCDC bit 4");
 
-        const WX_OFFSET: usize = 8;
+        const WX_OFFSET: usize = 7;
         let wx = self.regs.wx as usize;
         let disp_x_offset = wx.saturating_sub(WX_OFFSET);
         if disp_x_offset >= DISPLAY_WIDTH {
