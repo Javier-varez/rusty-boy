@@ -215,6 +215,7 @@ dependencies = [
  "crankstart",
  "crankstart-sys",
  "euclid",
+ "heapless",
  "ppu",
  "rusty-boy",
  "sm83",
