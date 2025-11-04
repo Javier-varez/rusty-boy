@@ -11,6 +11,9 @@ categories = ["embedded", "gaming"]
 keywords = ["embedded", "gameboy", "playdate"]
 readme = "../README.md"
 
+[lib]
+bench = false
+
 [[bench]]
 name = "ppu_line_drawing"
 harness = false
