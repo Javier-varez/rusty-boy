@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use core::mem::MaybeUninit;
+use core::mem::{transmute, MaybeUninit};
 
 use alloc::boxed::Box;
 
@@ -38,24 +38,25 @@ impl TileLine {
         Self([0; TILE_LINE_SIZE])
     }
 
-    pub fn iter(&self) -> TileLineIter {
-        TileLineIter {
-            tile_line: *self,
-            idx: 8,
-        }
-    }
+    pub fn iter(&self) -> core::array::IntoIter<PaletteIndex, TILE_WIDTH> {
+        let mut result = [MaybeUninit::uninit(); TILE_WIDTH];
+        (0..TILE_WIDTH)
+            .zip(result.iter_mut().rev())
+            .for_each(|(i, p)| {
+                let l = (self.0[0] >> i) & 1;
+                let r = (self.0[1] >> i) & 1;
+                // SAFETY:
+                //   - The input values are guaranteed to be ranged from 0 to 3 due to both l and r being
+                //     1-bit.
+                //   - The output values include enum values for all 3 possibilities
+                let v = unsafe { transmute::<u8, PaletteIndex>((r << 1) | l) };
+                p.write(v);
+            });
 
-    pub fn pixel(&self, index: usize) -> PaletteIndex {
-        let bit = 1 << index;
-        let lsb = (self.0[0] & bit) != 0;
-        let msb = (self.0[1] & bit) != 0;
-
-        match (msb, lsb) {
-            (false, false) => PaletteIndex::Id0,
-            (false, true) => PaletteIndex::Id1,
-            (true, false) => PaletteIndex::Id2,
-            (true, true) => PaletteIndex::Id3,
-        }
+        // SAFETY:
+        //  - The for_each loop above has initialized all values of the result
+        let result: [PaletteIndex; TILE_WIDTH] = unsafe { transmute(result) };
+        result.into_iter()
     }
 
     fn write(&mut self, address: sm83::memory::Address, value: u8) {
@@ -69,24 +70,6 @@ impl TileLine {
 
 // A tile line must occupy 2 bytes
 static_assertions::assert_eq_size!([u8; 2], TileLine);
-
-pub struct TileLineIter {
-    tile_line: TileLine,
-    idx: usize,
-}
-
-impl Iterator for TileLineIter {
-    type Item = PaletteIndex;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.idx > 0 {
-            self.idx -= 1;
-            let result = self.tile_line.pixel(self.idx);
-            Some(result)
-        } else {
-            None
-        }
-    }
-}
 
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Debug)]
