@@ -27,3 +27,4 @@ heapless.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
+rand = "0.9"
