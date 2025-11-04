@@ -71,47 +71,77 @@ fn save_game(fs: &FileSystem, name: &str, data: &[u8]) -> Result<(), anyhow::Err
 }
 
 fn render_frame(graphics: &Graphics, frame: &Frame) -> Result<(), anyhow::Error> {
+    let system = System::get();
+    system.reset_elapsed_time()?;
+
     let target = graphics.get_frame()?;
 
     const TARGET_WIDTH: usize =
         ((LCD_ROWS as f64) * (ppu::DISPLAY_WIDTH as f64) / (ppu::DISPLAY_HEIGHT as f64)) as usize;
     const TARGET_HEIGHT: usize = LCD_ROWS as usize;
 
-    let x_offset = (LCD_COLUMNS as usize - TARGET_WIDTH) / 2;
-    let y_offset = (LCD_ROWS as usize - TARGET_HEIGHT) / 2;
+    const X_OFFSET: usize = (LCD_COLUMNS as usize - TARGET_WIDTH) / 2;
 
     graphics.fill_rect(
         ScreenRect {
-            origin: Point2D::new(x_offset as i32, y_offset as i32),
+            origin: Point2D::new(X_OFFSET as i32, 0),
             size: Size2D::new(TARGET_WIDTH as i32, TARGET_HEIGHT as i32),
         },
         LCDColor::Solid(LCDSolidColor::kColorBlack),
     )?;
 
-    for y in y_offset..(y_offset + TARGET_HEIGHT) {
-        let ppu_y = ((y - y_offset) * ppu::DISPLAY_HEIGHT + (TARGET_HEIGHT / 2)) / TARGET_HEIGHT;
-        let ppu_line = &frame[ppu_y];
-        for x in x_offset..(x_offset + TARGET_WIDTH) {
-            let ppu_x = ((x - x_offset) * ppu::DISPLAY_WIDTH + (TARGET_WIDTH / 2)) / TARGET_WIDTH;
-            let pixel = ppu_line[ppu_x];
+    let ppu_x_offsets: heapless::Vec<(usize, u8), TARGET_WIDTH> = (0..TARGET_WIDTH)
+        .map(|offset| {
+            (
+                (offset * ppu::DISPLAY_WIDTH + (TARGET_WIDTH / 2)) / TARGET_WIDTH,
+                (offset & 1) as u8,
+            )
+        })
+        .collect();
 
-            let on = match pixel {
-                ppu::Color::White => 1,
-                ppu::Color::LightGrey if ((y & 1) != 0) || ((x & 1) != 0) => 1,
-                ppu::Color::LightGrey => 0,
-                ppu::Color::DarkGrey if ((y & 1) != 0) || ((x & 1) != 0) => 0,
-                ppu::Color::DarkGrey => 1,
-                ppu::Color::Black => 0,
-            };
+    const INITIAL_X_OFFSET_INNER: usize = X_OFFSET % 8;
+    const PIXELS_IN_BYTE: usize = 8;
 
-            let target_offset = (y * LCD_ROWSIZE as usize) + x / 8;
-            let target_bit = 7 - (x % 8);
+    target
+        .chunks_exact_mut(LCD_ROWSIZE as usize)
+        .enumerate()
+        .for_each(|(y, line)| {
+            let ppu_y = (y * ppu::DISPLAY_HEIGHT + (TARGET_HEIGHT / 2)) / TARGET_HEIGHT;
+            let odd_y = (y & 1) as u8;
+            let ppu_line = unsafe { frame.get_unchecked(ppu_y) };
 
-            target[target_offset] |= on << target_bit;
-        }
-    }
+            let mut x_offset_inner = INITIAL_X_OFFSET_INNER;
+            let mut ppu_x_offsets_iter = ppu_x_offsets.iter();
 
-    graphics.mark_updated_rows((y_offset as i32)..=(y_offset + TARGET_HEIGHT) as i32)?;
+            line.iter_mut()
+                .skip(X_OFFSET / 8)
+                .take((TARGET_WIDTH + INITIAL_X_OFFSET_INNER) / PIXELS_IN_BYTE)
+                .for_each(|b| {
+                    (x_offset_inner..PIXELS_IN_BYTE).for_each(|bit_idx| {
+                        let (ppu_x, odd_x) =
+                            unsafe { ppu_x_offsets_iter.next().unwrap_unchecked() };
+                        let pixel = unsafe { ppu_line.get_unchecked(*ppu_x) };
+
+                        let odd_pixel = odd_y | odd_x;
+                        let on = match pixel {
+                            ppu::Color::White => 1,
+                            ppu::Color::LightGrey => odd_pixel,
+                            ppu::Color::DarkGrey => 1 - odd_pixel,
+                            ppu::Color::Black => 0,
+                        };
+
+                        let target_bit = PIXELS_IN_BYTE - 1 - bit_idx;
+                        *b |= on << target_bit;
+                    });
+                    x_offset_inner = 0;
+                });
+        });
+
+    graphics.mark_updated_rows(0..=TARGET_HEIGHT as i32)?;
+
+    let time = system.get_elapsed_time()?;
+    System::log_to_console(&format!("Playdate render: {time} s"));
+
     Ok(())
 }
 
@@ -219,6 +249,8 @@ impl GameRunner {
 
         let graphics = Graphics::get();
         render_frame(&graphics, frame)?;
+
+        System::get().draw_fps(0, 0)?;
 
         Ok(false)
     }

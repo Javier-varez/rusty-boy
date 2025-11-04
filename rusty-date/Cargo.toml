@@ -39,3 +39,4 @@ rusty-boy = { path = "../rusty-boy" }
 cartridge = { path = "../cartridge" }
 ppu = { path = "../ppu" }
 sm83 = { path = "../sm83" }
+heapless = "0.8"
