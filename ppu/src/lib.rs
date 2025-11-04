@@ -84,9 +84,9 @@ pub type Frame = [[Color; DISPLAY_WIDTH]; DISPLAY_HEIGHT];
 
 /// The Picture Processing Unit
 pub struct Ppu {
-    vram: Vram,
-    regs: Registers,
-    oam: Oam,
+    pub vram: Vram,
+    pub regs: Registers,
+    pub oam: Oam,
 
     mode: Mode,
     cycles: Cycles,
@@ -320,6 +320,7 @@ impl Ppu {
             .cycle()
             .skip(x_tile_offset)
             .flat_map(|tile_index| {
+                // TODO: Optimize hot loop
                 self.vram
                     .get_tile(*tile_index, bg_tile_data_area)
                     .get_line(tile_line_idx)
@@ -482,7 +483,7 @@ impl Ppu {
     }
 
     #[cfg_attr(feature = "profile", inline(never))]
-    fn draw_line(&mut self) {
+    pub fn draw_line(&mut self) {
         if self.regs.lcdc.read(regs::LCDC::ENABLE) == 0 {
             return;
         }
@@ -510,6 +511,7 @@ impl Ppu {
             if let Some((_, object_color)) = object_color {
                 *pixel = *object_color;
             } else {
+                // TODO: consider caching palette translation instead of computing it every time for every pixel.
                 *pixel = bg_palette.color(*bg_palette_idx);
             }
         }

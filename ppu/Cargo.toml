@@ -11,6 +11,10 @@ categories = ["embedded", "gaming"]
 keywords = ["embedded", "gameboy", "playdate"]
 readme = "../README.md"
 
+[[bench]]
+name = "ppu_line_drawing"
+harness = false
+
 [features]
 profile = []
 
@@ -20,3 +24,6 @@ tock-registers.workspace = true
 static_assertions.workspace = true
 log.workspace = true
 heapless.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true

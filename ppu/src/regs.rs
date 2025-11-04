@@ -101,35 +101,35 @@ register_bitfields! [
 ];
 
 pub struct DmaConfig {
-    pub(crate) triggered: bool,
-    pub(crate) address: u8,
+    pub triggered: bool,
+    pub address: u8,
 }
 
 pub struct Registers {
     // LCDC => 0xFF40
-    pub(crate) lcdc: InMemoryRegister<u8, LCDC::Register>,
+    pub lcdc: InMemoryRegister<u8, LCDC::Register>,
     // LCD Status => 0xFF41
-    pub(crate) status: InMemoryRegister<u8, STAT::Register>,
+    pub status: InMemoryRegister<u8, STAT::Register>,
     // Background viewport Y coordinate => 0xFF42
-    pub(crate) scy: u8,
+    pub scy: u8,
     // Background viewport X coordinate => 0xFF43
-    pub(crate) scx: u8,
+    pub scx: u8,
     // LCD Y coordinate => 0xFF44
-    pub(crate) ly: u8,
+    pub ly: u8,
     // LCD Y compare coordinate => 0xFF45
-    pub(crate) lyc: u8,
+    pub lyc: u8,
     // DMA Configuration register
-    pub(crate) dma_config: DmaConfig,
+    pub dma_config: DmaConfig,
     // BG palette => 0xFF47
-    pub(crate) bg_palette: Palette,
+    pub bg_palette: Palette,
     // Obj palette 0 => 0xFF48
-    pub(crate) obj_palette0: Palette,
+    pub obj_palette0: Palette,
     // Obj palette 1 => 0xFF49
-    pub(crate) obj_palette1: Palette,
+    pub obj_palette1: Palette,
     // Window Y coordinate => 0xFF4A
-    pub(crate) wy: u8,
+    pub wy: u8,
     // Window X coordinate => 0xFF4B
-    pub(crate) wx: u8,
+    pub wx: u8,
 }
 
 impl Default for Registers {
