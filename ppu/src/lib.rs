@@ -233,7 +233,7 @@ impl Ppu {
     }
 
     #[cfg_attr(feature = "profile", inline(never))]
-    fn oam_scan(&mut self) {
+    pub fn oam_scan(&mut self) {
         self.selected_oam_entries = heapless::Vec::new();
 
         let obj_height = (self.regs.lcdc.read(regs::LCDC::OBJ_SIZE) + 1) * 8;
