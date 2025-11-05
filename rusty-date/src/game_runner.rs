@@ -14,7 +14,6 @@ use {
     crankstart_sys::{FileOptions, PDButtons, LCD_COLUMNS, LCD_ROWS, LCD_ROWSIZE},
 };
 
-use cartridge::Cartridge;
 use rusty_boy::RustyBoy;
 
 const DUMMY_BUTTON_CYCLES: usize = 30;
@@ -181,7 +180,8 @@ impl GameRunner {
         system: &System,
         rom: crate::game_selector::Rom,
     ) -> Result<Self, anyhow::Error> {
-        let cartridge = Cartridge::try_new(rom.data).map_err(|e| anyhow::format_err!("{e:?}"))?;
+        let cartridge =
+            cartridge::new_mapper(rom.data).map_err(|e| anyhow::format_err!("{e:?}"))?;
         let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge);
         rusty_boy.configure_cpu_step(sm83::core::Cycles::new(60));
 

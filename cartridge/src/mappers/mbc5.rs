@@ -1,4 +1,4 @@
-use crate::header::{self, CartridgeHeader};
+use crate::header::CartridgeHeader;
 
 extern crate alloc;
 
@@ -56,8 +56,8 @@ impl Mbc5 {
 }
 
 impl Mapper for Mbc5 {
-    fn header(&self) -> Result<CartridgeHeader<'_>, header::Error> {
-        CartridgeHeader::try_new(&self.rom)
+    fn header(&self) -> CartridgeHeader<'_> {
+        CartridgeHeader::try_new(&self.rom).unwrap()
     }
 
     fn read(&self, address: sm83::memory::Address) -> u8 {

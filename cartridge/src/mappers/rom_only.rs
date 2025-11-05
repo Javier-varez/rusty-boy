@@ -1,4 +1,4 @@
-use crate::header::{self, CartridgeHeader};
+use crate::header::CartridgeHeader;
 
 extern crate alloc;
 
@@ -17,8 +17,8 @@ impl RomOnly {
 }
 
 impl Mapper for RomOnly {
-    fn header(&self) -> Result<CartridgeHeader<'_>, header::Error> {
-        CartridgeHeader::try_new(&self.data)
+    fn header(&self) -> CartridgeHeader<'_> {
+        CartridgeHeader::try_new(&self.data).unwrap()
     }
 
     fn read(&self, address: sm83::memory::Address) -> u8 {

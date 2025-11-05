@@ -9,7 +9,6 @@ use yew::Component;
 use yew::prelude::*;
 
 use crate::joypad::Joypad;
-use cartridge::Cartridge;
 use rusty_boy::RustyBoy;
 
 use crate::app::AppState;
@@ -57,7 +56,7 @@ impl Component for Game {
             data.clone()
         };
 
-        let cartridge = Cartridge::try_new(data)
+        let cartridge = cartridge::new_mapper(data)
             .map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))
             .unwrap();
         let title = cartridge.header().title.to_string();
