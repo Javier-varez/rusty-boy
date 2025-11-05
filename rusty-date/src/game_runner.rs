@@ -3,10 +3,6 @@ extern crate alloc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
-use crankstart::geometry::ScreenRect;
-use crankstart::graphics::LCDColor;
-use crankstart_sys::LCDSolidColor;
-use euclid::{Point2D, Size2D};
 use ppu::Frame;
 
 use {
@@ -70,56 +66,82 @@ fn save_game(fs: &FileSystem, name: &str, data: &[u8]) -> Result<(), anyhow::Err
     Ok(())
 }
 
-fn render_frame(graphics: &Graphics, frame: &Frame) -> Result<(), anyhow::Error> {
-    let system = System::get();
-    system.reset_elapsed_time()?;
+const BYTE_ALIGNMENT: usize = !7;
 
-    let target = graphics.get_frame()?;
-
-    const TARGET_WIDTH: usize =
+const TARGET_WIDTH: usize = {
+    let size =
         ((LCD_ROWS as f64) * (ppu::DISPLAY_WIDTH as f64) / (ppu::DISPLAY_HEIGHT as f64)) as usize;
-    const TARGET_HEIGHT: usize = LCD_ROWS as usize;
+    // The width will be 2 pixels shorter than it should be, but this should make rendering nicer,
+    // as we don't need to account for initial offset within a byte
+    size & BYTE_ALIGNMENT
+};
 
-    const X_OFFSET: usize = (LCD_COLUMNS as usize - TARGET_WIDTH) / 2;
+const TARGET_HEIGHT: usize = LCD_ROWS as usize;
 
-    graphics.fill_rect(
-        ScreenRect {
-            origin: Point2D::new(X_OFFSET as i32, 0),
-            size: Size2D::new(TARGET_WIDTH as i32, TARGET_HEIGHT as i32),
-        },
-        LCDColor::Solid(LCDSolidColor::kColorBlack),
-    )?;
+const X_OFFSET: usize = ((LCD_COLUMNS as usize - TARGET_WIDTH) / 2) & BYTE_ALIGNMENT;
 
-    let ppu_x_offsets: heapless::Vec<(usize, u8), TARGET_WIDTH> = (0..TARGET_WIDTH)
-        .map(|offset| {
-            (
-                (offset * ppu::DISPLAY_WIDTH + (TARGET_WIDTH / 2)) / TARGET_WIDTH,
-                (offset & 1) as u8,
-            )
-        })
-        .collect();
+const PPU_X_OFFSETS: [(usize, u8); TARGET_WIDTH] = {
+    let mut res = [(0, 0); TARGET_WIDTH];
+    let mut offset = 0;
+    while offset < TARGET_WIDTH {
+        res[offset] = (
+            (offset * ppu::DISPLAY_WIDTH + (TARGET_WIDTH / 2)) / TARGET_WIDTH,
+            (offset & 1) as u8,
+        );
+        offset += 1;
+    }
+    res
+};
 
-    const INITIAL_X_OFFSET_INNER: usize = X_OFFSET % 8;
+const PPU_Y_OFFSETS: [(usize, u8); TARGET_HEIGHT] = {
+    let mut res = [(0, 0); TARGET_HEIGHT];
+    let mut offset = 0;
+    while offset < TARGET_HEIGHT {
+        res[offset] = (
+            (offset * ppu::DISPLAY_HEIGHT + (TARGET_HEIGHT / 2)) / TARGET_HEIGHT,
+            (offset & 1) as u8,
+        );
+        offset += 1;
+    }
+    res
+};
+
+fn render_frame(graphics: &Graphics, source_frame: &Frame) {
+    let system = System::get();
+    system.reset_elapsed_time().unwrap();
+
     const PIXELS_IN_BYTE: usize = 8;
 
-    target
+    let target_framebuffer = graphics.get_frame().unwrap();
+    target_framebuffer
         .chunks_exact_mut(LCD_ROWSIZE as usize)
-        .enumerate()
-        .for_each(|(y, line)| {
-            let ppu_y = (y * ppu::DISPLAY_HEIGHT + (TARGET_HEIGHT / 2)) / TARGET_HEIGHT;
-            let odd_y = (y & 1) as u8;
-            let ppu_line = unsafe { frame.get_unchecked(ppu_y) };
+        .zip(PPU_Y_OFFSETS)
+        .for_each(|(line, (ppu_y, odd_y))| {
+            // SAFETY: The PPU_Y bounds are guaranteed, as they are checked at compile time
+            let ppu_line = unsafe { source_frame.get_unchecked(ppu_y) };
 
-            let mut x_offset_inner = INITIAL_X_OFFSET_INNER;
-            let mut ppu_x_offsets_iter = ppu_x_offsets.iter();
+            let mut ppu_x_offsets_iter = PPU_X_OFFSETS.iter();
 
             line.iter_mut()
-                .skip(X_OFFSET / 8)
-                .take((TARGET_WIDTH + INITIAL_X_OFFSET_INNER) / PIXELS_IN_BYTE)
+                .skip(X_OFFSET / PIXELS_IN_BYTE)
+                .take(TARGET_WIDTH / PIXELS_IN_BYTE)
                 .for_each(|b| {
-                    (x_offset_inner..PIXELS_IN_BYTE).for_each(|bit_idx| {
+                    *b = 0;
+
+                    (0..PIXELS_IN_BYTE).for_each(|bit_idx| {
                         let (ppu_x, odd_x) =
+                            // SAFETY: The PPU_X_OFFSETS array contains exactly one item for each pixel
+                            // in a line. The line is located at an 8-bit-aligned boundary, and its
+                            // size is a multiple of 8 bytes. These preconditions are validated right
+                            // below at compile time.
                             unsafe { ppu_x_offsets_iter.next().unwrap_unchecked() };
+
+                        const _: () = const {
+                            assert!((TARGET_WIDTH % PIXELS_IN_BYTE) == 0);
+                            assert!((X_OFFSET % PIXELS_IN_BYTE) == 0);
+                        };
+
+                        // SAFETY: The PPU_X bounds are guaranteed, as they are checked at compile time
                         let pixel = unsafe { ppu_line.get_unchecked(*ppu_x) };
 
                         let odd_pixel = odd_y | odd_x;
@@ -133,16 +155,15 @@ fn render_frame(graphics: &Graphics, frame: &Frame) -> Result<(), anyhow::Error>
                         let target_bit = PIXELS_IN_BYTE - 1 - bit_idx;
                         *b |= on << target_bit;
                     });
-                    x_offset_inner = 0;
                 });
         });
 
-    graphics.mark_updated_rows(0..=TARGET_HEIGHT as i32)?;
+    graphics
+        .mark_updated_rows(0..=TARGET_HEIGHT as i32)
+        .unwrap();
 
-    let time = system.get_elapsed_time()?;
-    System::log_to_console(&format!("Playdate render: {time} s"));
-
-    Ok(())
+    let time = system.get_elapsed_time().unwrap();
+    System::log_to_console(&format!("Rendering took: {time}"));
 }
 
 pub struct GameRunner {
@@ -198,10 +219,10 @@ impl GameRunner {
         Ok(())
     }
 
-    pub fn update(&mut self) -> Result<bool, anyhow::Error> {
+    pub fn update(&mut self) -> bool {
         if TERMINATE.load(Ordering::Relaxed) {
-            self.save_game()?;
-            return Ok(true);
+            self.save_game().unwrap();
+            return true;
         }
 
         if SELECT_BUTTON.swap(false, Ordering::Relaxed) {
@@ -212,7 +233,7 @@ impl GameRunner {
         }
 
         let mut joypad_state = rusty_boy::joypad::State::new();
-        let (current, _, _) = System::get().get_button_state()?;
+        let (current, _, _) = System::get().get_button_state().unwrap();
         if (current & PDButtons::kButtonA).0 != 0 {
             joypad_state.a = true;
         }
@@ -248,10 +269,10 @@ impl GameRunner {
         let frame = self.rusty_boy.run_until_next_frame(true);
 
         let graphics = Graphics::get();
-        render_frame(&graphics, frame)?;
+        render_frame(&graphics, frame);
 
-        System::get().draw_fps(0, 0)?;
+        System::get().draw_fps(0, 0).unwrap();
 
-        Ok(false)
+        false
     }
 }

@@ -7,7 +7,7 @@ mod game_selector;
 extern crate alloc;
 
 use {
-    alloc::{boxed::Box, format},
+    alloc::boxed::Box,
     crankstart::{
         crankstart_game,
         file::FileSystem,
@@ -58,7 +58,7 @@ impl Game for State {
                 selected_rom = selector.update(&self.font)?;
             }
             View::GameRunner(runner) => {
-                terminate_game = runner.update()?;
+                terminate_game = runner.update();
             }
         }
 
@@ -81,7 +81,6 @@ impl Game for State {
         _playdate: &mut Playdate,
         event: PDSystemEvent,
     ) -> Result<(), anyhow::Error> {
-        System::log_to_console(&format!("{event:?}"));
         if event == PDSystemEvent::kEventTerminate || event == PDSystemEvent::kEventLock {
             match &mut self.view {
                 View::GameRunner(runner) => {
