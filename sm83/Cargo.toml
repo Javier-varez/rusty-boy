@@ -11,6 +11,13 @@ categories = ["embedded", "gaming"]
 keywords = ["embedded", "gameboy", "playdate"]
 readme = "../README.md"
 
+[lib]
+bench = false
+
+[[bench]]
+name = "cpu_instr"
+harness = false
+
 [features]
 profile = []
 
@@ -20,3 +27,5 @@ sm83_decoder_macros.workspace = true
 [dev-dependencies]
 serde.workspace = true
 toml.workspace = true
+criterion.workspace = true
+rand = "0.9"
