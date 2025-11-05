@@ -4,7 +4,6 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use anyhow::bail;
-use cartridge::Cartridge;
 use clap::Parser;
 use ppu::{Color, Frame, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
@@ -146,7 +145,7 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let rom_data = std::fs::read(&args.rom_path)?;
-    let cartridge = Cartridge::try_new(rom_data)
+    let cartridge = cartridge::new_mapper(rom_data)
         .map_err(|e| anyhow::format_err!("Invalid cartridge: {}", e))?;
     let mut rusty_boy = RustyBoy::new_with_cartridge(cartridge);
 

@@ -18,7 +18,7 @@ mod rom_only;
 pub trait Mapper {
     /// Obtains the header of the cartridge. It can fail if the rom does not contain enough data
     /// for the header or the title of the game is not a valid string.
-    fn header(&self) -> Result<CartridgeHeader<'_>, header::Error>;
+    fn header(&self) -> CartridgeHeader<'_>;
 
     /// Reads the given memory-mapped address of the cartridge. Panics if the address does not
     /// belong the address space of the cartridge (0x0000 to 0x8000 or 0xA000 to 0xC000).
@@ -38,6 +38,24 @@ pub trait Mapper {
     /// RAM from a save file after the emulator starts up.
     fn restore_battery_backed_ram(&mut self, _ram: &[u8]) -> Result<(), crate::Error> {
         Err(crate::Error::CartridgeHasNoRam)
+    }
+
+    /// Returns true if the cartridge has a battery to keep RAM powered while the GameBoy is off.
+    fn has_battery(&self) -> bool {
+        matches!(
+            self.header().cartridge_type,
+            CartridgeType::Mbc1RamBattery
+                | CartridgeType::Mbc2Battery
+                | CartridgeType::RomRamBattery
+                | CartridgeType::Mmm01RamBattery
+                | CartridgeType::Mbc3TimerBattery
+                | CartridgeType::Mbc3TimerRamBattery
+                | CartridgeType::Mbc3RamBattery
+                | CartridgeType::Mbc5RamBattery
+                | CartridgeType::Mbc5RumbleRamBattery
+                | CartridgeType::Mbc7SensorRumbleRamBattery
+                | CartridgeType::Huc1RamBattery
+        )
     }
 }
 
