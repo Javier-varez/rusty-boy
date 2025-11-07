@@ -271,8 +271,6 @@ impl GameRunner {
         let graphics = Graphics::get();
         render_frame(&graphics, frame);
 
-        System::get().draw_fps(0, 0).unwrap();
-
         false
     }
 }
