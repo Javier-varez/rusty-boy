@@ -10,7 +10,7 @@
 //! use cartridge::Cartridge;
 //!
 //! let data = std::fs::read("my_cartridge.gb").expect("Unable to read cartridge from disk");
-//! let mut cartridge = Cartridge::try_new(data).expect("Cartridge is not valid");
+//! let mut cartridge = cartridge::new_mapper(data).expect("Cartridge is not valid");
 //!
 //! // Query the cartridge header with:
 //! let header = cartridge.header();
